@@ -38,7 +38,7 @@ struct MessageInput: View {
                     TextField("Message your coach...", text: inputTextBinding, axis: .vertical)
                         .textFieldStyle(.plain)
                         .font(.body)
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(Color.warmGray900)
                         .tint(.accentColor)
                         .lineLimit(1...5)
                         .focused($isInputFocused)
@@ -72,11 +72,11 @@ struct MessageInput: View {
                 .padding(.vertical, 8)
                 .background(
                     RoundedRectangle(cornerRadius: 20)
-                        .fill(Color(.systemGray6))
+                        .fill(Color.warmGray200)
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: 20)
-                        .stroke(Color(.systemGray4), lineWidth: 0.5)
+                        .stroke(Color.warmGray300, lineWidth: 0.5)
                 )
 
                 // Send button - only show when there's text (like iMessage)
