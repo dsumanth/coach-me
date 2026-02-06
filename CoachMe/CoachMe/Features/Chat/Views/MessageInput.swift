@@ -8,8 +8,7 @@
 import SwiftUI
 import UIKit
 
-/// Message input area with text field, voice input, and send button
-/// Per architecture.md: Use AdaptiveGlassContainer for grouping
+/// Message input area with iMessage-style text field design
 struct MessageInput: View {
     @Bindable var viewModel: ChatViewModel
     @Bindable var voiceViewModel: VoiceInputViewModel
@@ -23,12 +22,24 @@ struct MessageInput: View {
                     .transition(.opacity.combined(with: .scale))
             }
 
-            AdaptiveGlassInputContainer {
-                HStack(spacing: 12) {
+            HStack(spacing: 8) {
+                // Plus button (like iMessage)
+                Button(action: {}) {
+                    Image(systemName: "plus")
+                        .font(.system(size: 20, weight: .medium))
+                        .foregroundStyle(Color(.systemGray))
+                }
+                .frame(width: 32, height: 32)
+                .accessibilityLabel("Add attachment")
+
+                // iMessage-style text input container
+                HStack(spacing: 8) {
                     // Text input
                     TextField("Message your coach...", text: inputTextBinding, axis: .vertical)
                         .textFieldStyle(.plain)
                         .font(.body)
+                        .foregroundStyle(.primary)
+                        .tint(.accentColor)
                         .lineLimit(1...5)
                         .focused($isInputFocused)
                         .submitLabel(.send)
@@ -38,41 +49,65 @@ struct MessageInput: View {
                         .accessibilityLabel("Message input")
                         .accessibilityHint("Type your message to the coach")
 
-                    // Voice input button (Story 1.8)
-                    VoiceInputButton(
-                        isRecording: voiceViewModel.isRecording,
-                        isDisabled: viewModel.isLoading || viewModel.isStreaming,
-                        onPress: {
-                            Task {
-                                await voiceViewModel.startRecording()
+                    // Voice input button inside the text field (like iMessage)
+                    // Keep visible while recording so gesture can complete
+                    if !hasText || voiceViewModel.isRecording {
+                        VoiceInputButton(
+                            isRecording: voiceViewModel.isRecording,
+                            isDisabled: viewModel.isLoading || viewModel.isStreaming,
+                            onPress: {
+                                Task {
+                                    await voiceViewModel.startRecording()
+                                }
+                            },
+                            onRelease: {
+                                Task {
+                                    await voiceViewModel.stopRecording()
+                                }
                             }
-                        },
-                        onRelease: {
-                            Task {
-                                await voiceViewModel.stopRecording()
-                            }
-                        }
-                    )
+                        )
+                    }
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(
+                    RoundedRectangle(cornerRadius: 20)
+                        .fill(Color(.systemGray6))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 20)
+                        .stroke(Color(.systemGray4), lineWidth: 0.5)
+                )
 
-                    // Send button with adaptive glass per AC4
+                // Send button - only show when there's text (like iMessage)
+                if hasText {
                     Button(action: sendMessage) {
                         Image(systemName: "arrow.up.circle.fill")
                             .font(.system(size: 32))
-                            .foregroundStyle(sendButtonColor)
+                            .foregroundStyle(canSend ? Color.accentColor : Color(.systemGray3))
                     }
                     .disabled(!canSend)
-                    .adaptiveInteractiveGlass()
                     .accessibilityLabel("Send message")
                     .accessibilityHint(canSend ? "Sends your message to the coach" : "Type a message first")
+                    .transition(.scale.combined(with: .opacity))
                 }
             }
         }
-        .padding(.horizontal, 16)
+        .padding(.horizontal, 12)
         .padding(.bottom, 8)
         .animation(.easeInOut(duration: 0.2), value: voiceViewModel.isRecording)
+        .animation(.easeInOut(duration: 0.15), value: hasText)
     }
 
     // MARK: - Computed Properties
+
+    /// Whether there's any text in the input
+    private var hasText: Bool {
+        let textToCheck = voiceViewModel.transcribedText.isEmpty
+            ? viewModel.inputText
+            : voiceViewModel.transcribedText
+        return !textToCheck.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
 
     /// Binding that syncs voice transcription with input text
     /// Fix for code review M3: Clearer, symmetric get/set behavior
@@ -112,11 +147,6 @@ struct MessageInput: View {
         return !textToCheck.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
                !viewModel.isLoading &&
                !voiceViewModel.isRecording
-    }
-
-    /// Color for the send button based on state
-    private var sendButtonColor: Color {
-        canSend ? Color.terracotta : Color.warmGray400
     }
 
     // MARK: - Actions

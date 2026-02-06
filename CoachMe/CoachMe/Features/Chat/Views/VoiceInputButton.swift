@@ -23,31 +23,51 @@ struct VoiceInputButton: View {
     var onRelease: () -> Void
 
     /// Internal state to prevent multiple onPress calls during gesture
-    /// Fix for code review H1: DragGesture.onChanged fires repeatedly
     @State private var hasTriggeredPress = false
+
+    /// Tracks if we initiated recording (to know when to call onRelease)
+    @State private var didStartRecording = false
+
+    /// Task for delayed press activation - cancelled if user releases early
+    @State private var pressTask: Task<Void, Never>?
+
+    /// Minimum press duration before starting recording (in seconds)
+    private static let minimumPressDuration: TimeInterval = 0.15
 
     var body: some View {
         Button(action: {}) {
-            Image(systemName: isRecording ? "mic.fill" : "mic")
-                .font(.system(size: 20))
+            Image(systemName: isRecording ? "waveform" : "waveform")
+                .font(.system(size: 18, weight: .medium))
                 .foregroundStyle(buttonColor)
-                .frame(width: 44, height: 44)
+                .symbolEffect(.variableColor.iterative, isActive: isRecording)
+                .frame(width: 28, height: 28)
+                .contentShape(Rectangle())
         }
-        .adaptiveInteractiveGlass()
+        .buttonStyle(.plain)
         .disabled(isDisabled)
         .simultaneousGesture(
             DragGesture(minimumDistance: 0)
                 .onChanged { _ in
-                    // Only trigger onPress once per gesture (fix for H1)
+                    // Only trigger press sequence once per gesture
                     if !hasTriggeredPress && !isRecording && !isDisabled {
                         hasTriggeredPress = true
-                        onPress()
+                        pressTask = Task {
+                            try? await Task.sleep(for: .seconds(Self.minimumPressDuration))
+                            guard !Task.isCancelled else { return }
+                            await MainActor.run {
+                                didStartRecording = true
+                                onPress()
+                            }
+                        }
                     }
                 }
                 .onEnded { _ in
-                    // Reset press state for next gesture
                     hasTriggeredPress = false
-                    if isRecording {
+                    pressTask?.cancel()
+                    pressTask = nil
+                    // Call onRelease if we initiated recording
+                    if didStartRecording {
+                        didStartRecording = false
                         onRelease()
                     }
                 }
@@ -60,9 +80,9 @@ struct VoiceInputButton: View {
 
     private var buttonColor: Color {
         if isDisabled {
-            return .warmGray300
+            return Color(.systemGray4)
         }
-        return isRecording ? .terracotta : .warmGray600
+        return isRecording ? .red : Color(.systemGray)
     }
 }
 
