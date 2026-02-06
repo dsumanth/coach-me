@@ -1,0 +1,2 @@
+[functions.chat-stream]
+verify_jwt = true

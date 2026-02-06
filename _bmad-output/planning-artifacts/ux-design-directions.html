@@ -1,0 +1,1097 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Coach App — Design Direction Exploration</title>
+    <style>
+        :root {
+            /* Warm Palette - Core */
+            --surface-base: #FFFBF7;
+            --surface-elevated: #FFFFFF;
+            --surface-subtle: #F5F0EB;
+            --text-primary: #1C1917;
+            --text-secondary: #57534E;
+            --text-muted: #A8A29E;
+
+            /* Accent - Terracotta */
+            --accent-primary: #C2410C;
+            --accent-subtle: #FFEDD5;
+            --accent-hover: #9A3412;
+
+            /* Supporting */
+            --success: #15803D;
+            --success-subtle: #DCFCE7;
+            --border: #E7E5E4;
+            --shadow: rgba(28, 25, 23, 0.08);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif;
+            background: #1C1917;
+            color: var(--text-primary);
+            line-height: 1.5;
+        }
+
+        /* Header */
+        .header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: rgba(28, 25, 23, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 16px 24px;
+            z-index: 100;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            color: #FAFAF9;
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .header-nav {
+            display: flex;
+            gap: 8px;
+        }
+
+        .header-nav button {
+            background: rgba(255, 255, 255, 0.1);
+            border: none;
+            color: #FAFAF9;
+            padding: 8px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+
+        .header-nav button:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .header-nav button.active {
+            background: var(--accent-primary);
+        }
+
+        /* Main Container */
+        .main {
+            padding-top: 72px;
+        }
+
+        /* Direction Section */
+        .direction {
+            min-height: 100vh;
+            padding: 48px 24px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .direction-header {
+            text-align: center;
+            margin-bottom: 32px;
+            max-width: 600px;
+        }
+
+        .direction-header h2 {
+            color: #FAFAF9;
+            font-size: 28px;
+            margin-bottom: 8px;
+        }
+
+        .direction-header p {
+            color: #A8A29E;
+            font-size: 16px;
+        }
+
+        .direction-tag {
+            display: inline-block;
+            background: var(--accent-primary);
+            color: white;
+            padding: 4px 12px;
+            border-radius: 16px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-bottom: 12px;
+        }
+
+        /* Phone Frame */
+        .phone-frame {
+            width: 375px;
+            height: 812px;
+            background: var(--surface-base);
+            border-radius: 44px;
+            overflow: hidden;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            position: relative;
+        }
+
+        .phone-notch {
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 150px;
+            height: 34px;
+            background: #1C1917;
+            border-radius: 0 0 20px 20px;
+            z-index: 10;
+        }
+
+        .phone-content {
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Status Bar */
+        .status-bar {
+            height: 44px;
+            padding: 0 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            padding-bottom: 8px;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        /* Tab Bar */
+        .tab-bar {
+            height: 83px;
+            background: var(--surface-elevated);
+            border-top: 1px solid var(--border);
+            display: flex;
+            justify-content: space-around;
+            align-items: flex-start;
+            padding-top: 8px;
+        }
+
+        .tab-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            color: var(--text-muted);
+            font-size: 10px;
+        }
+
+        .tab-item.active {
+            color: var(--accent-primary);
+        }
+
+        .tab-icon {
+            width: 24px;
+            height: 24px;
+            border-radius: 6px;
+            background: currentColor;
+            opacity: 0.3;
+        }
+
+        .tab-item.active .tab-icon {
+            opacity: 1;
+        }
+
+        /* Chat Area Common */
+        .chat-area {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .input-bar {
+            padding: 12px 16px 34px;
+            background: var(--surface-elevated);
+            border-top: 1px solid var(--border);
+        }
+
+        .input-field {
+            background: var(--surface-subtle);
+            border-radius: 24px;
+            padding: 12px 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .input-placeholder {
+            color: var(--text-muted);
+            flex: 1;
+        }
+
+        .send-btn {
+            width: 32px;
+            height: 32px;
+            background: var(--accent-primary);
+            border-radius: 50%;
+        }
+
+        /* Message Bubbles */
+        .message {
+            max-width: 85%;
+        }
+
+        .message.user {
+            align-self: flex-end;
+            background: var(--accent-primary);
+            color: white;
+            padding: 12px 16px;
+            border-radius: 20px 20px 4px 20px;
+        }
+
+        .message.coach {
+            align-self: flex-start;
+            background: var(--surface-elevated);
+            border: 1px solid var(--border);
+            padding: 12px 16px;
+            border-radius: 20px 20px 20px 4px;
+            box-shadow: 0 1px 3px var(--shadow);
+        }
+
+        .message.memory {
+            background: var(--accent-subtle);
+            border: 1px solid #FED7AA;
+        }
+
+        .memory-indicator {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 11px;
+            color: var(--accent-primary);
+            margin-bottom: 6px;
+            font-weight: 500;
+        }
+
+        .memory-dot {
+            width: 6px;
+            height: 6px;
+            background: var(--accent-primary);
+            border-radius: 50%;
+        }
+
+        /* Typing Indicator */
+        .typing-indicator {
+            display: flex;
+            gap: 4px;
+            padding: 16px;
+            align-self: flex-start;
+        }
+
+        .typing-dot {
+            width: 8px;
+            height: 8px;
+            background: var(--text-muted);
+            border-radius: 50%;
+            animation: typing 1.4s infinite;
+        }
+
+        .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+        .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+
+        @keyframes typing {
+            0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+            30% { transform: translateY(-4px); opacity: 1; }
+        }
+
+        /* Conversation Starters */
+        .starters {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            padding: 24px 16px;
+        }
+
+        .starter {
+            background: var(--surface-elevated);
+            border: 1px solid var(--border);
+            padding: 16px 20px;
+            border-radius: 16px;
+            font-size: 15px;
+            color: var(--text-primary);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .starter:hover {
+            border-color: var(--accent-primary);
+            box-shadow: 0 2px 8px var(--shadow);
+        }
+
+        /* Welcome State */
+        .welcome {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 32px;
+            text-align: center;
+        }
+
+        .welcome-icon {
+            width: 64px;
+            height: 64px;
+            background: var(--accent-subtle);
+            border-radius: 20px;
+            margin-bottom: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+        }
+
+        .welcome h3 {
+            font-size: 22px;
+            margin-bottom: 8px;
+            color: var(--text-primary);
+        }
+
+        .welcome p {
+            color: var(--text-secondary);
+            font-size: 15px;
+            margin-bottom: 32px;
+        }
+
+        /* Profile View */
+        .profile-header {
+            padding: 60px 24px 24px;
+            text-align: center;
+            background: linear-gradient(180deg, var(--accent-subtle) 0%, var(--surface-base) 100%);
+        }
+
+        .profile-avatar {
+            width: 80px;
+            height: 80px;
+            background: var(--accent-primary);
+            border-radius: 50%;
+            margin: 0 auto 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+            color: white;
+        }
+
+        .profile-name {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .profile-subtitle {
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+
+        .profile-section {
+            padding: 24px;
+        }
+
+        .profile-section h4 {
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-muted);
+            margin-bottom: 12px;
+        }
+
+        .profile-card {
+            background: var(--surface-elevated);
+            border-radius: 16px;
+            padding: 16px;
+            border: 1px solid var(--border);
+        }
+
+        .profile-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 12px 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .profile-item:last-child {
+            border-bottom: none;
+        }
+
+        .profile-label {
+            color: var(--text-secondary);
+        }
+
+        .profile-value {
+            font-weight: 500;
+        }
+
+        /* History View */
+        .history-list {
+            padding: 60px 16px 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .history-card {
+            background: var(--surface-elevated);
+            border-radius: 16px;
+            padding: 16px;
+            border: 1px solid var(--border);
+        }
+
+        .history-meta {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+
+        .history-domain {
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            color: var(--accent-primary);
+            background: var(--accent-subtle);
+            padding: 2px 8px;
+            border-radius: 4px;
+        }
+
+        .history-time {
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        .history-preview {
+            font-size: 14px;
+            color: var(--text-secondary);
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        /* Direction-Specific Variations */
+
+        /* Direction 1: Minimal Zen */
+        .direction-1 .phone-frame {
+            background: #FFFDF9;
+        }
+
+        .direction-1 .message.coach {
+            border: none;
+            background: transparent;
+            box-shadow: none;
+            padding: 16px 0;
+        }
+
+        .direction-1 .message.user {
+            background: var(--text-primary);
+        }
+
+        .direction-1 .input-field {
+            background: transparent;
+            border: 1px solid var(--border);
+        }
+
+        /* Direction 2: Cozy Warmth */
+        .direction-2 .phone-frame {
+            background: #FEF7ED;
+        }
+
+        .direction-2 .message.coach {
+            background: #FFF7ED;
+            border-color: #FED7AA;
+        }
+
+        .direction-2 .tab-bar {
+            background: #FEF7ED;
+            border-top-color: #FED7AA;
+        }
+
+        /* Direction 3: Professional Trust */
+        .direction-3 .message.user {
+            background: #292524;
+        }
+
+        .direction-3 .tab-bar {
+            background: #FAFAF9;
+        }
+
+        /* Direction 4: Soft Focus */
+        .direction-4 .phone-frame {
+            background: linear-gradient(180deg, #FFFBF7 0%, #FEF7ED 100%);
+        }
+
+        .direction-4 .message.coach {
+            border-radius: 24px;
+            border: none;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+        }
+
+        .direction-4 .message.user {
+            border-radius: 24px;
+        }
+
+        /* Direction 5: Bold Presence */
+        .direction-5 .welcome-icon {
+            background: var(--accent-primary);
+            color: white;
+        }
+
+        .direction-5 .starter {
+            border: 2px solid transparent;
+            background: var(--accent-subtle);
+        }
+
+        .direction-5 .starter:hover {
+            border-color: var(--accent-primary);
+        }
+
+        /* Direction 6: Intimate Journal */
+        .direction-6 .phone-frame {
+            background: #FAF9F7;
+        }
+
+        .direction-6 .message.coach {
+            font-family: Georgia, serif;
+            font-size: 15px;
+            line-height: 1.6;
+            border: none;
+            background: transparent;
+            padding: 16px 8px;
+        }
+
+        .direction-6 .welcome h3 {
+            font-family: Georgia, serif;
+            font-weight: 400;
+        }
+
+        /* Comparison Grid */
+        .comparison {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 24px;
+            padding: 48px 24px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .comparison .phone-frame {
+            width: 100%;
+            height: auto;
+            aspect-ratio: 375/812;
+        }
+
+        /* Notes Panel */
+        .notes {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 32px 24px;
+        }
+
+        .notes h3 {
+            color: #FAFAF9;
+            font-size: 20px;
+            margin-bottom: 16px;
+        }
+
+        .notes ul {
+            color: #A8A29E;
+            padding-left: 20px;
+        }
+
+        .notes li {
+            margin-bottom: 12px;
+            line-height: 1.6;
+        }
+
+        .notes strong {
+            color: #FAFAF9;
+        }
+
+        /* Footer */
+        .footer {
+            text-align: center;
+            padding: 48px 24px;
+            color: #78716C;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <h1>Coach App — Design Directions</h1>
+        <nav class="header-nav">
+            <button class="active" onclick="scrollToDirection(1)">1</button>
+            <button onclick="scrollToDirection(2)">2</button>
+            <button onclick="scrollToDirection(3)">3</button>
+            <button onclick="scrollToDirection(4)">4</button>
+            <button onclick="scrollToDirection(5)">5</button>
+            <button onclick="scrollToDirection(6)">6</button>
+        </nav>
+    </header>
+
+    <main class="main">
+        <!-- Direction 1: Minimal Zen -->
+        <section class="direction direction-1" id="direction-1">
+            <div class="direction-header">
+                <span class="direction-tag">DIRECTION 1</span>
+                <h2>Minimal Zen</h2>
+                <p>Maximum breathing room. Conversations float on pure white. The coach's words have space to land. For users who want calm over stimulation.</p>
+            </div>
+            <div class="phone-frame">
+                <div class="phone-notch"></div>
+                <div class="phone-content">
+                    <div class="status-bar">
+                        <span>9:41</span>
+                        <span></span>
+                    </div>
+                    <div class="chat-area">
+                        <div class="message user">
+                            I've been feeling stuck in my career lately. Like I'm just going through the motions.
+                        </div>
+                        <div class="message coach">
+                            That feeling of going through the motions — how long has it been present?
+                        </div>
+                        <div class="message user">
+                            Maybe six months? Since I got passed over for promotion.
+                        </div>
+                        <div class="message coach memory">
+                            <div class="memory-indicator">
+                                <span class="memory-dot"></span>
+                                From our conversation last week
+                            </div>
+                            You mentioned your manager doesn't see your contributions. I'm curious — is the stuckness about the role itself, or about feeling unseen?
+                        </div>
+                        <div class="typing-indicator">
+                            <div class="typing-dot"></div>
+                            <div class="typing-dot"></div>
+                            <div class="typing-dot"></div>
+                        </div>
+                    </div>
+                    <div class="input-bar">
+                        <div class="input-field">
+                            <span class="input-placeholder">What's on your mind?</span>
+                            <div class="send-btn"></div>
+                        </div>
+                    </div>
+                    <nav class="tab-bar">
+                        <div class="tab-item active">
+                            <div class="tab-icon"></div>
+                            <span>Chat</span>
+                        </div>
+                        <div class="tab-item">
+                            <div class="tab-icon"></div>
+                            <span>History</span>
+                        </div>
+                        <div class="tab-item">
+                            <div class="tab-icon"></div>
+                            <span>Profile</span>
+                        </div>
+                        <div class="tab-item">
+                            <div class="tab-icon"></div>
+                            <span>Settings</span>
+                        </div>
+                    </nav>
+                </div>
+            </div>
+            <div class="notes">
+                <h3>Key Characteristics</h3>
+                <ul>
+                    <li><strong>Ultra-minimal chrome</strong> — No borders on coach messages, content floats</li>
+                    <li><strong>Maximum whitespace</strong> — Messages have room to breathe</li>
+                    <li><strong>Dark user bubbles</strong> — Black instead of terracotta, more neutral</li>
+                    <li><strong>Best for:</strong> Users who find typical apps overstimulating</li>
+                    <li><strong>Risk:</strong> May feel too sparse, less cozy warmth</li>
+                </ul>
+            </div>
+        </section>
+
+        <!-- Direction 2: Cozy Warmth -->
+        <section class="direction direction-2" id="direction-2">
+            <div class="direction-header">
+                <span class="direction-tag">DIRECTION 2</span>
+                <h2>Cozy Warmth</h2>
+                <p>Embraces the warm palette throughout. Every surface has a hint of warmth. Feels like a comfortable room, not a digital interface.</p>
+            </div>
+            <div class="phone-frame">
+                <div class="phone-notch"></div>
+                <div class="phone-content">
+                    <div class="status-bar">
+                        <span>9:41</span>
+                        <span></span>
+                    </div>
+                    <div class="welcome">
+                        <div class="welcome-icon">&#x1F331;</div>
+                        <h3>Good evening</h3>
+                        <p>What would you like to explore today?</p>
+                    </div>
+                    <div class="starters">
+                        <div class="starter">Something's been on my mind...</div>
+                        <div class="starter">I need help with a decision</div>
+                        <div class="starter">I want to set a new goal</div>
+                    </div>
+                    <div class="input-bar">
+                        <div class="input-field">
+                            <span class="input-placeholder">Or type anything...</span>
+                            <div class="send-btn"></div>
+                        </div>
+                    </div>
+                    <nav class="tab-bar">
+                        <div class="tab-item active">
+                            <div class="tab-icon"></div>
+                            <span>Chat</span>
+                        </div>
+                        <div class="tab-item">
+                            <div class="tab-icon"></div>
+                            <span>History</span>
+                        </div>
+                        <div class="tab-item">
+                            <div class="tab-icon"></div>
+                            <span>Profile</span>
+                        </div>
+                        <div class="tab-item">
+                            <div class="tab-icon"></div>
+                            <span>Settings</span>
+                        </div>
+                    </nav>
+                </div>
+            </div>
+            <div class="notes">
+                <h3>Key Characteristics</h3>
+                <ul>
+                    <li><strong>Warm cream background</strong> — Not white, distinctly warm throughout</li>
+                    <li><strong>Orange-tinted accents</strong> — Peach tones in message backgrounds</li>
+                    <li><strong>Emoji personality</strong> — Friendly icon in welcome state</li>
+                    <li><strong>Best for:</strong> Maximum "human-crafted" feeling, anti-ChatGPT</li>
+                    <li><strong>Risk:</strong> May feel too "soft" for some users, less professional</li>
+                </ul>
+            </div>
+        </section>
+
+        <!-- Direction 3: Professional Trust -->
+        <section class="direction direction-3" id="direction-3">
+            <div class="direction-header">
+                <span class="direction-tag">DIRECTION 3</span>
+                <h2>Professional Trust</h2>
+                <p>Clean and grounded. Warm but not playful. Signals "real coaching" rather than "wellness app." For users who want depth without decoration.</p>
+            </div>
+            <div class="phone-frame">
+                <div class="phone-notch"></div>
+                <div class="phone-content">
+                    <div class="status-bar">
+                        <span>9:41</span>
+                        <span></span>
+                    </div>
+                    <div class="profile-header">
+                        <div class="profile-avatar">S</div>
+                        <div class="profile-name">Sarah</div>
+                        <div class="profile-subtitle">How I understand you</div>
+                    </div>
+                    <div class="profile-section">
+                        <h4>Your Values</h4>
+                        <div class="profile-card">
+                            <div class="profile-item">
+                                <span class="profile-label">Authenticity</span>
+                                <span class="profile-value">Core value</span>
+                            </div>
+                            <div class="profile-item">
+                                <span class="profile-label">Growth</span>
+                                <span class="profile-value">Core value</span>
+                            </div>
+                            <div class="profile-item">
+                                <span class="profile-label">Connection</span>
+                                <span class="profile-value">Important</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="profile-section">
+                        <h4>Current Focus</h4>
+                        <div class="profile-card">
+                            <div class="profile-item">
+                                <span class="profile-label">Career transition</span>
+                                <span class="profile-value">Active</span>
+                            </div>
+                        </div>
+                    </div>
+                    <nav class="tab-bar">
+                        <div class="tab-item">
+                            <div class="tab-icon"></div>
+                            <span>Chat</span>
+                        </div>
+                        <div class="tab-item">
+                            <div class="tab-icon"></div>
+                            <span>History</span>
+                        </div>
+                        <div class="tab-item active">
+                            <div class="tab-icon"></div>
+                            <span>Profile</span>
+                        </div>
+                        <div class="tab-item">
+                            <div class="tab-icon"></div>
+                            <span>Settings</span>
+                        </div>
+                    </nav>
+                </div>
+            </div>
+            <div class="notes">
+                <h3>Key Characteristics</h3>
+                <ul>
+                    <li><strong>Structured information</strong> — Clear labels, organized data</li>
+                    <li><strong>Profile as mirror</strong> — "How I understand you" framing</li>
+                    <li><strong>Dark user messages</strong> — Charcoal instead of orange, more serious</li>
+                    <li><strong>Best for:</strong> Users who want coaching credibility, professional feel</li>
+                    <li><strong>Risk:</strong> May feel less emotionally inviting than warmer options</li>
+                </ul>
+            </div>
+        </section>
+
+        <!-- Direction 4: Soft Focus -->
+        <section class="direction direction-4" id="direction-4">
+            <div class="direction-header">
+                <span class="direction-tag">DIRECTION 4</span>
+                <h2>Soft Focus</h2>
+                <p>Gentle gradients and soft shadows. Everything feels slightly blurred at the edges. Like looking at the world through morning light.</p>
+            </div>
+            <div class="phone-frame">
+                <div class="phone-notch"></div>
+                <div class="phone-content">
+                    <div class="status-bar">
+                        <span>9:41</span>
+                        <span></span>
+                    </div>
+                    <div class="chat-area">
+                        <div class="message user">
+                            I had that conversation with my partner about moving cities. It didn't go well.
+                        </div>
+                        <div class="message coach">
+                            I'm sorry to hear that. What happened when you brought it up?
+                        </div>
+                        <div class="message user">
+                            She said she felt blindsided. That I'd been planning this without her.
+                        </div>
+                        <div class="message coach memory">
+                            <div class="memory-indicator">
+                                <span class="memory-dot"></span>
+                                Reflecting on your pattern
+                            </div>
+                            This connects to something we've noticed before. You tend to fully form ideas before sharing them — wanting to have answers ready. But it can make others feel excluded from the process. Does that land?
+                        </div>
+                    </div>
+                    <div class="input-bar">
+                        <div class="input-field">
+                            <span class="input-placeholder">Continue the conversation...</span>
+                            <div class="send-btn"></div>
+                        </div>
+                    </div>
+                    <nav class="tab-bar">
+                        <div class="tab-item active">
+                            <div class="tab-icon"></div>
+                            <span>Chat</span>
+                        </div>
+                        <div class="tab-item">
+                            <div class="tab-icon"></div>
+                            <span>History</span>
+                        </div>
+                        <div class="tab-item">
+                            <div class="tab-icon"></div>
+                            <span>Profile</span>
+                        </div>
+                        <div class="tab-item">
+                            <div class="tab-icon"></div>
+                            <span>Settings</span>
+                        </div>
+                    </nav>
+                </div>
+            </div>
+            <div class="notes">
+                <h3>Key Characteristics</h3>
+                <ul>
+                    <li><strong>Gradient background</strong> — Subtle warm-to-warmer gradient</li>
+                    <li><strong>Very rounded bubbles</strong> — 24px radius, softer than standard</li>
+                    <li><strong>Soft drop shadows</strong> — Diffuse shadows create depth without edges</li>
+                    <li><strong>Pattern insight treatment</strong> — Shows cross-session observation</li>
+                    <li><strong>Best for:</strong> Maximum softness, dreamy quality</li>
+                    <li><strong>Risk:</strong> Gradients can feel dated if not executed carefully</li>
+                </ul>
+            </div>
+        </section>
+
+        <!-- Direction 5: Bold Presence -->
+        <section class="direction direction-5" id="direction-5">
+            <div class="direction-header">
+                <span class="direction-tag">DIRECTION 5</span>
+                <h2>Bold Presence</h2>
+                <p>Confident use of the accent color. Conversation starters feel like invitations, not options. The coach has presence.</p>
+            </div>
+            <div class="phone-frame">
+                <div class="phone-notch"></div>
+                <div class="phone-content">
+                    <div class="status-bar">
+                        <span>9:41</span>
+                        <span></span>
+                    </div>
+                    <div class="welcome">
+                        <div class="welcome-icon" style="background: var(--accent-primary); color: white;">&#x2728;</div>
+                        <h3>Ready when you are</h3>
+                        <p>Pick a starting point, or just dive in.</p>
+                    </div>
+                    <div class="starters">
+                        <div class="starter" style="background: var(--accent-subtle); border: 2px solid transparent;">Something's weighing on me</div>
+                        <div class="starter" style="background: var(--accent-subtle); border: 2px solid transparent;">I want to think something through</div>
+                        <div class="starter" style="background: var(--accent-subtle); border: 2px solid transparent;">I need to make a decision</div>
+                    </div>
+                    <div class="input-bar">
+                        <div class="input-field">
+                            <span class="input-placeholder">Or start fresh...</span>
+                            <div class="send-btn"></div>
+                        </div>
+                    </div>
+                    <nav class="tab-bar">
+                        <div class="tab-item active">
+                            <div class="tab-icon"></div>
+                            <span>Chat</span>
+                        </div>
+                        <div class="tab-item">
+                            <div class="tab-icon"></div>
+                            <span>History</span>
+                        </div>
+                        <div class="tab-item">
+                            <div class="tab-icon"></div>
+                            <span>Profile</span>
+                        </div>
+                        <div class="tab-item">
+                            <div class="tab-icon"></div>
+                            <span>Settings</span>
+                        </div>
+                    </nav>
+                </div>
+            </div>
+            <div class="notes">
+                <h3>Key Characteristics</h3>
+                <ul>
+                    <li><strong>Accent-filled starters</strong> — Peach backgrounds make them feel substantial</li>
+                    <li><strong>Bold icon treatment</strong> — Filled accent icon, not outline</li>
+                    <li><strong>Confident copy</strong> — "Ready when you are" vs passive greetings</li>
+                    <li><strong>Best for:</strong> Users who want the coach to feel present and confident</li>
+                    <li><strong>Risk:</strong> May feel too directive for users who want softer entry</li>
+                </ul>
+            </div>
+        </section>
+
+        <!-- Direction 6: Intimate Journal -->
+        <section class="direction direction-6" id="direction-6">
+            <div class="direction-header">
+                <span class="direction-tag">DIRECTION 6</span>
+                <h2>Intimate Journal</h2>
+                <p>Serif typography for coach responses. Feels like reading a thoughtful letter, not chat messages. Literary, personal, timeless.</p>
+            </div>
+            <div class="phone-frame">
+                <div class="phone-notch"></div>
+                <div class="phone-content">
+                    <div class="status-bar">
+                        <span>9:41</span>
+                        <span></span>
+                    </div>
+                    <div class="history-list">
+                        <div class="history-card">
+                            <div class="history-meta">
+                                <span class="history-domain">Career</span>
+                                <span class="history-time">Today, 9:15 PM</span>
+                            </div>
+                            <div class="history-preview">You explored the tension between wanting recognition and fearing visibility. A pattern worth watching.</div>
+                        </div>
+                        <div class="history-card">
+                            <div class="history-meta">
+                                <span class="history-domain">Relationships</span>
+                                <span class="history-time">Yesterday</span>
+                            </div>
+                            <div class="history-preview">We discussed the conversation with your partner about the move. You're processing feeling misunderstood.</div>
+                        </div>
+                        <div class="history-card">
+                            <div class="history-meta">
+                                <span class="history-domain">Mindset</span>
+                                <span class="history-time">Jan 25</span>
+                            </div>
+                            <div class="history-preview">You noticed you've been avoiding discomfort rather than sitting with it. That awareness is progress.</div>
+                        </div>
+                    </div>
+                    <nav class="tab-bar">
+                        <div class="tab-item">
+                            <div class="tab-icon"></div>
+                            <span>Chat</span>
+                        </div>
+                        <div class="tab-item active">
+                            <div class="tab-icon"></div>
+                            <span>History</span>
+                        </div>
+                        <div class="tab-item">
+                            <div class="tab-icon"></div>
+                            <span>Profile</span>
+                        </div>
+                        <div class="tab-item">
+                            <div class="tab-icon"></div>
+                            <span>Settings</span>
+                        </div>
+                    </nav>
+                </div>
+            </div>
+            <div class="notes">
+                <h3>Key Characteristics</h3>
+                <ul>
+                    <li><strong>Serif typography</strong> — Georgia for coach content, literary feel</li>
+                    <li><strong>Reflective summaries</strong> — History cards read like journal entries</li>
+                    <li><strong>Domain badges</strong> — Subtle categorization without during-chat selection</li>
+                    <li><strong>Best for:</strong> Users who want coaching to feel like wisdom, not chat</li>
+                    <li><strong>Risk:</strong> Serif on mobile is unusual, may feel dated to some</li>
+                </ul>
+            </div>
+        </section>
+
+        <footer class="footer">
+            <p>Coach App — Design Direction Exploration</p>
+            <p style="margin-top: 8px; color: #57534E;">Open this file in a browser to explore all 6 directions. Scroll or use the numbered navigation.</p>
+        </footer>
+    </main>
+
+    <script>
+        function scrollToDirection(num) {
+            document.getElementById('direction-' + num).scrollIntoView({ behavior: 'smooth' });
+
+            // Update active button
+            document.querySelectorAll('.header-nav button').forEach((btn, i) => {
+                btn.classList.toggle('active', i === num - 1);
+            });
+        }
+
+        // Update active button on scroll
+        window.addEventListener('scroll', () => {
+            const directions = document.querySelectorAll('.direction');
+            const buttons = document.querySelectorAll('.header-nav button');
+
+            let current = 0;
+            directions.forEach((dir, i) => {
+                const rect = dir.getBoundingClientRect();
+                if (rect.top < window.innerHeight / 2) {
+                    current = i;
+                }
+            });
+
+            buttons.forEach((btn, i) => {
+                btn.classList.toggle('active', i === current);
+            });
+        });
+    </script>
+</body>
+</html>

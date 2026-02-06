@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(xcodebuild:*)",
+      "Bash(brew upgrade:*)",
+      "Bash(supabase functions deploy:*)",
+      "Bash(supabase db push:*)",
+      "Bash(git init:*)"
+    ]
+  }
+}
