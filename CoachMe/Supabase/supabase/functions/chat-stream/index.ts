@@ -4,10 +4,13 @@ import { verifyAuth } from '../_shared/auth.ts';
 import { errorResponse, sseHeaders } from '../_shared/response.ts';
 import { streamChatCompletion, calculateCost, type ChatMessage } from '../_shared/llm-client.ts';
 import { logUsage } from '../_shared/cost-tracker.ts';
+import { loadUserContext } from '../_shared/context-loader.ts';
+import { buildCoachingPrompt, hasMemoryMoments } from '../_shared/prompt-builder.ts';
 
 interface ChatRequest {
   message: string;
-  conversationId: string;
+  conversation_id?: string;  // snake_case from iOS client
+  conversationId?: string;   // camelCase fallback
 }
 
 serve(async (req: Request) => {
@@ -21,7 +24,9 @@ serve(async (req: Request) => {
 
     // Parse request body
     const body: ChatRequest = await req.json();
-    const { message, conversationId } = body;
+    const message = body.message;
+    // Support both snake_case (iOS) and camelCase
+    const conversationId = body.conversation_id || body.conversationId;
 
     if (!message?.trim() || !conversationId) {
       return errorResponse('Missing message or conversationId', 400);
@@ -55,6 +60,10 @@ serve(async (req: Request) => {
       return errorResponse('Failed to save message', 500);
     }
 
+    // Story 2.4: Load user context for personalized coaching
+    // Target <200ms per architecture NFR
+    const userContext = await loadUserContext(supabase, userId);
+
     // Load conversation history for context
     const { data: historyMessages } = await supabase
       .from('messages')
@@ -63,8 +72,8 @@ serve(async (req: Request) => {
       .order('created_at', { ascending: true })
       .limit(20); // Limit history to prevent token overflow
 
-    // Build message array for LLM
-    const systemPrompt = buildSystemPrompt();
+    // Story 2.4: Build context-aware system prompt
+    const systemPrompt = buildCoachingPrompt(userContext);
     const messages: ChatMessage[] = [
       { role: 'system', content: systemPrompt },
       ...(historyMessages ?? []).map((m: { role: string; content: string }) => ({
@@ -87,8 +96,14 @@ serve(async (req: Request) => {
           for await (const chunk of streamChatCompletion(messages, { model })) {
             if (chunk.type === 'token' && chunk.content) {
               fullContent += chunk.content;
-              // Send SSE event
-              const event = `data: ${JSON.stringify({ type: 'token', content: chunk.content })}\n\n`;
+              // Story 2.4: Detect memory moments in streamed content (AC #4)
+              const memoryMoment = hasMemoryMoments(fullContent);
+              // Send SSE event with memory_moment flag
+              const event = `data: ${JSON.stringify({
+                type: 'token',
+                content: chunk.content,
+                memory_moment: memoryMoment
+              })}\n\n`;
               controller.enqueue(encoder.encode(event));
             }
 
@@ -129,10 +144,10 @@ serve(async (req: Request) => {
                 costUsd,
               });
 
-              // Send done event
+              // Send done event (use snake_case to match iOS client decoder)
               const doneEvent = `data: ${JSON.stringify({
                 type: 'done',
-                messageId: assistantMessageId,
+                message_id: assistantMessageId,
                 usage: tokenUsage
               })}\n\n`;
               controller.enqueue(encoder.encode(doneEvent));
@@ -171,20 +186,5 @@ serve(async (req: Request) => {
   }
 });
 
-/**
- * Build system prompt for coaching
- * Will be enhanced in Story 3.1 with domain routing
- */
-function buildSystemPrompt(): string {
-  return `You are a warm, supportive life coach. Your role is to help users reflect, gain clarity, and take meaningful action in their lives.
-
-Guidelines:
-- Be warm, empathetic, and non-judgmental
-- Ask thoughtful questions to help users explore their thoughts
-- Never diagnose, prescribe, or claim clinical expertise
-- If users mention crisis indicators (self-harm, suicide), acknowledge their feelings and encourage professional help
-- Keep responses conversational and coaching-focused
-- Reference previous parts of the conversation when relevant
-
-Remember: You are a coach, not a therapist. Help users think through challenges and find their own insights.`;
-}
+// Note: System prompt building moved to _shared/prompt-builder.ts (Story 2.4)
+// Domain routing will be added in Story 3.1

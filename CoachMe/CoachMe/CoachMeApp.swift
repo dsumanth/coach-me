@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import SwiftData
 import Sentry
 
 @main
@@ -21,5 +22,8 @@ struct CoachMeApp: App {
         WindowGroup {
             RootView()
         }
+        // Use AppEnvironment's modelContainer as single source of truth
+        // This ensures ContextRepository and SwiftUI views share the same container
+        .modelContainer(AppEnvironment.shared.modelContainer)
     }
 }

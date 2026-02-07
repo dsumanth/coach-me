@@ -4,13 +4,18 @@
 //
 //  Created by Sumanth Daggubati on 2/6/26.
 //
+//  Story 2.4: Updated to render memory moments with visual treatment (UX-4)
+//
 
 import SwiftUI
 
 /// Chat bubble for user and assistant messages
 /// Per architecture.md: NO glass on content — same styling on both iOS tiers
+/// Story 2.4: Assistant messages parse and highlight memory moments
 struct MessageBubble: View {
     let message: ChatMessage
+
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         HStack {
@@ -19,9 +24,7 @@ struct MessageBubble: View {
             }
 
             VStack(alignment: message.isFromUser ? .trailing : .leading, spacing: 4) {
-                Text(message.content)
-                    .font(.body)
-                    .foregroundColor(textColor)
+                bubbleContent
                     .padding(.horizontal, 16)
                     .padding(.vertical, 12)
                     .background(bubbleBackground)
@@ -40,8 +43,60 @@ struct MessageBubble: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 4)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(message.isFromUser ? "You" : "Coach"): \(message.content)")
+        .accessibilityLabel(accessibilityText)
         .accessibilityHint("Sent at \(message.formattedTime)")
+    }
+
+    // MARK: - Bubble Content
+
+    /// Story 2.4: Renders content with memory moment highlighting for assistant messages
+    @ViewBuilder
+    private var bubbleContent: some View {
+        if message.isFromUser {
+            // User messages: plain text
+            Text(message.content)
+                .font(.body)
+                .foregroundColor(textColor)
+        } else {
+            // Assistant messages: parse for memory moments
+            assistantContentView
+        }
+    }
+
+    /// Assistant message content with memory moment detection
+    @ViewBuilder
+    private var assistantContentView: some View {
+        let parseResult = MemoryMomentParser.parse(message.content)
+
+        VStack(alignment: .leading, spacing: 8) {
+            Text(parseResult.cleanText)
+                .font(.body)
+                .foregroundColor(textColor)
+
+            // Story 2.4: Show memory moments with visual treatment
+            if parseResult.hasMemoryMoments {
+                FlowLayout(spacing: 6) {
+                    ForEach(parseResult.moments) { moment in
+                        MemoryMomentText(content: moment.content)
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: - Accessibility
+
+    /// Accessibility label including memory moment context
+    private var accessibilityText: String {
+        let sender = message.isFromUser ? "You" : "Coach"
+        let parseResult = MemoryMomentParser.parse(message.content)
+
+        if parseResult.hasMemoryMoments {
+            let momentContents = parseResult.moments.map { "I remembered: \($0.content)" }.joined(separator: ". ")
+            return "\(sender): \(parseResult.cleanText). \(momentContents)"
+        } else {
+            return "\(sender): \(message.content)"
+        }
     }
 
     // MARK: - Styling
@@ -122,4 +177,41 @@ struct MessageBubbleShape: Shape {
             ))
         }
     }
+}
+
+#Preview("With Memory Moments") {
+    ZStack {
+        Color.cream.ignoresSafeArea()
+
+        VStack(spacing: 16) {
+            MessageBubble(message: ChatMessage.userMessage(
+                content: "I'm struggling with a decision at work.",
+                conversationId: UUID()
+            ))
+
+            MessageBubble(message: ChatMessage.assistantMessage(
+                content: "Given that you value [MEMORY: honesty and authenticity], how does this situation align with that? I remember you mentioned [MEMORY: navigating a career transition] - this sounds like it might be connected.",
+                conversationId: UUID()
+            ))
+        }
+    }
+}
+
+#Preview("Dark Mode") {
+    ZStack {
+        Color.creamDark.ignoresSafeArea()
+
+        VStack(spacing: 16) {
+            MessageBubble(message: ChatMessage.userMessage(
+                content: "How do I stay motivated?",
+                conversationId: UUID()
+            ))
+
+            MessageBubble(message: ChatMessage.assistantMessage(
+                content: "Thinking about your goal of [MEMORY: becoming a better leader], what would that version of you do to stay motivated?",
+                conversationId: UUID()
+            ))
+        }
+    }
+    .preferredColorScheme(.dark)
 }

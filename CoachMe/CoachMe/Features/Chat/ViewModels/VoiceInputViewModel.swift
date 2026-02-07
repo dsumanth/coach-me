@@ -40,6 +40,14 @@ final class VoiceInputViewModel {
     /// Fix for code review M1: Moved from VoiceInputService to avoid Swift 6 concurrency issues
     private var hasSpeechBeenDetected = false
 
+    /// Tracks when recording started to enforce minimum duration
+    /// Users must hold for at least this duration for a valid recording
+    private var recordingStartTime: Date?
+
+    /// Minimum recording duration in seconds before showing "no speech detected" error
+    /// Quick taps shorter than this are silently ignored (not real recording attempts)
+    private static let minimumRecordingDuration: TimeInterval = 0.5
+
     enum PermissionStatus {
         case notDetermined
         case authorized
@@ -81,13 +89,14 @@ final class VoiceInputViewModel {
             return
         }
 
-        if speechAuth == .denied {
+        // Handle denied or restricted states
+        if speechAuth == .denied || speechAuth == .restricted {
             error = .permissionDenied
             showError = true
             return
         }
 
-        if micAuth == .denied {
+        if micAuth == .denied || micAuth == .restricted {
             error = .microphonePermissionDenied
             showError = true
             return
@@ -98,6 +107,7 @@ final class VoiceInputViewModel {
             isRecording = true
             transcribedText = ""
             hasSpeechBeenDetected = false  // Reset for new recording session
+            recordingStartTime = Date()  // Track start time for minimum duration check
 
             try await voiceInputService.startRecording(
                 onPartialResult: { [weak self] text in
@@ -144,11 +154,23 @@ final class VoiceInputViewModel {
         let wasRecording = isRecording
         let noSpeechDetected = !hasSpeechBeenDetected
 
+        // Calculate recording duration to distinguish real recordings from quick taps
+        let recordingDuration: TimeInterval
+        if let startTime = recordingStartTime {
+            recordingDuration = Date().timeIntervalSince(startTime)
+        } else {
+            recordingDuration = 0
+        }
+
         await voiceInputService.stopRecording()
         isRecording = false
+        recordingStartTime = nil
 
-        // Show error if no speech was detected during recording (fix for code review M1)
-        if wasRecording && noSpeechDetected {
+        // Only show "no speech detected" error if:
+        // 1. We were actually recording
+        // 2. No speech was detected
+        // 3. Recording duration exceeded minimum threshold (not just a quick tap)
+        if wasRecording && noSpeechDetected && recordingDuration >= Self.minimumRecordingDuration {
             error = .noSpeechDetected
             showError = true
         }
@@ -159,9 +181,11 @@ final class VoiceInputViewModel {
         let speechGranted = await voiceInputService.requestSpeechAuthorization()
         let micGranted = await voiceInputService.requestMicrophoneAuthorization()
 
+        // Always dismiss the permission sheet after requesting
+        showPermissionSheet = false
+
         if speechGranted && micGranted {
             permissionStatus = .authorized
-            showPermissionSheet = false
             await startRecording()
         } else {
             permissionStatus = .denied

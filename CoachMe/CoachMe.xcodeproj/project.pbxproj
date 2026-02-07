@@ -12,11 +12,40 @@
 		C93853AB2F34F6CF00C5A27E /* Sentry in Frameworks */ = {isa = PBXBuildFile; productRef = SENTRY0000022F35000000000006 /* Sentry */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		C9174F992F35B9C200CF7AB2 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = C93853872F34E29200C5A27E /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = C938538E2F34E29200C5A27E;
+			remoteInfo = CoachMe;
+		};
+		C9174FA82F35BA8000CF7AB2 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = C93853872F34E29200C5A27E /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = C938538E2F34E29200C5A27E;
+			remoteInfo = CoachMe;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
+		C9174F952F35B9C200CF7AB2 /* CoachMeTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = CoachMeTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		C9174FA22F35BA8000CF7AB2 /* CoachMeUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = CoachMeUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		C938538F2F34E29200C5A27E /* CoachMe.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = CoachMe.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
+		C9174F962F35B9C200CF7AB2 /* CoachMeTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = CoachMeTests;
+			sourceTree = "<group>";
+		};
+		C9174FA32F35BA8000CF7AB2 /* CoachMeUITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = CoachMeUITests;
+			sourceTree = "<group>";
+		};
 		C93853912F34E29200C5A27E /* CoachMe */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = CoachMe;
@@ -25,6 +54,20 @@
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		C9174F922F35B9C200CF7AB2 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C9174F9F2F35BA8000CF7AB2 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		C938538C2F34E29200C5A27E /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -42,6 +85,8 @@
 			isa = PBXGroup;
 			children = (
 				C93853912F34E29200C5A27E /* CoachMe */,
+				C9174F962F35B9C200CF7AB2 /* CoachMeTests */,
+				C9174FA32F35BA8000CF7AB2 /* CoachMeUITests */,
 				C93853902F34E29200C5A27E /* Products */,
 			);
 			sourceTree = "<group>";
@@ -50,6 +95,8 @@
 			isa = PBXGroup;
 			children = (
 				C938538F2F34E29200C5A27E /* CoachMe.app */,
+				C9174F952F35B9C200CF7AB2 /* CoachMeTests.xctest */,
+				C9174FA22F35BA8000CF7AB2 /* CoachMeUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -57,6 +104,52 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		C9174F942F35B9C200CF7AB2 /* CoachMeTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = C9174F9B2F35B9C200CF7AB2 /* Build configuration list for PBXNativeTarget "CoachMeTests" */;
+			buildPhases = (
+				C9174F912F35B9C200CF7AB2 /* Sources */,
+				C9174F922F35B9C200CF7AB2 /* Frameworks */,
+				C9174F932F35B9C200CF7AB2 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				C9174F9A2F35B9C200CF7AB2 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				C9174F962F35B9C200CF7AB2 /* CoachMeTests */,
+			);
+			name = CoachMeTests;
+			packageProductDependencies = (
+			);
+			productName = CoachMeTests;
+			productReference = C9174F952F35B9C200CF7AB2 /* CoachMeTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		C9174FA12F35BA8000CF7AB2 /* CoachMeUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = C9174FAA2F35BA8000CF7AB2 /* Build configuration list for PBXNativeTarget "CoachMeUITests" */;
+			buildPhases = (
+				C9174F9E2F35BA8000CF7AB2 /* Sources */,
+				C9174F9F2F35BA8000CF7AB2 /* Frameworks */,
+				C9174FA02F35BA8000CF7AB2 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				C9174FA92F35BA8000CF7AB2 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				C9174FA32F35BA8000CF7AB2 /* CoachMeUITests */,
+			);
+			name = CoachMeUITests;
+			packageProductDependencies = (
+			);
+			productName = CoachMeUITests;
+			productReference = C9174FA22F35BA8000CF7AB2 /* CoachMeUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 		C938538E2F34E29200C5A27E /* CoachMe */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = C938539A2F34E29600C5A27E /* Build configuration list for PBXNativeTarget "CoachMe" */;
@@ -92,6 +185,14 @@
 				LastSwiftUpdateCheck = 2620;
 				LastUpgradeCheck = 2620;
 				TargetAttributes = {
+					C9174F942F35B9C200CF7AB2 = {
+						CreatedOnToolsVersion = 26.2;
+						TestTargetID = C938538E2F34E29200C5A27E;
+					};
+					C9174FA12F35BA8000CF7AB2 = {
+						CreatedOnToolsVersion = 26.2;
+						TestTargetID = C938538E2F34E29200C5A27E;
+					};
 					C938538E2F34E29200C5A27E = {
 						CreatedOnToolsVersion = 26.2;
 					};
@@ -117,11 +218,27 @@
 			projectRoot = "";
 			targets = (
 				C938538E2F34E29200C5A27E /* CoachMe */,
+				C9174F942F35B9C200CF7AB2 /* CoachMeTests */,
+				C9174FA12F35BA8000CF7AB2 /* CoachMeUITests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		C9174F932F35B9C200CF7AB2 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C9174FA02F35BA8000CF7AB2 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		C938538D2F34E29200C5A27E /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -132,6 +249,20 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		C9174F912F35B9C200CF7AB2 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C9174F9E2F35BA8000CF7AB2 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		C938538B2F34E29200C5A27E /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -141,7 +272,106 @@
 		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXTargetDependency section */
+		C9174F9A2F35B9C200CF7AB2 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = C938538E2F34E29200C5A27E /* CoachMe */;
+			targetProxy = C9174F992F35B9C200CF7AB2 /* PBXContainerItemProxy */;
+		};
+		C9174FA92F35BA8000CF7AB2 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = C938538E2F34E29200C5A27E /* CoachMe */;
+			targetProxy = C9174FA82F35BA8000CF7AB2 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
 /* Begin XCBuildConfiguration section */
+		C9174F9C2F35B9C200CF7AB2 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = R67735N7V8;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "Nimblocity-AI-Labs.CoachMeTests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/CoachMe.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/CoachMe";
+			};
+			name = Debug;
+		};
+		C9174F9D2F35B9C200CF7AB2 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = R67735N7V8;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "Nimblocity-AI-Labs.CoachMeTests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/CoachMe.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/CoachMe";
+			};
+			name = Release;
+		};
+		C9174FAB2F35BA8000CF7AB2 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = R67735N7V8;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "Nimblocity-AI-Labs.CoachMeUITests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = CoachMe;
+			};
+			name = Debug;
+		};
+		C9174FAC2F35BA8000CF7AB2 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = R67735N7V8;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "Nimblocity-AI-Labs.CoachMeUITests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = CoachMe;
+			};
+			name = Release;
+		};
 		C93853982F34E29600C5A27E /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -201,6 +431,7 @@
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 			};
@@ -258,6 +489,7 @@
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				VALIDATE_PRODUCT = YES;
 			};
@@ -344,6 +576,24 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		C9174F9B2F35B9C200CF7AB2 /* Build configuration list for PBXNativeTarget "CoachMeTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C9174F9C2F35B9C200CF7AB2 /* Debug */,
+				C9174F9D2F35B9C200CF7AB2 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		C9174FAA2F35BA8000CF7AB2 /* Build configuration list for PBXNativeTarget "CoachMeUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C9174FAB2F35BA8000CF7AB2 /* Debug */,
+				C9174FAC2F35BA8000CF7AB2 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		C938538A2F34E29200C5A27E /* Build configuration list for PBXProject "CoachMe" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (

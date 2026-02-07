@@ -7,6 +7,7 @@
 
 import Foundation
 import Supabase
+import SwiftData
 
 @MainActor
 final class AppEnvironment {
@@ -21,6 +22,32 @@ final class AppEnvironment {
             supabaseKey: Configuration.supabasePublishableKey
         )
     }()
+
+    /// SwiftData ModelContainer for offline caching
+    /// Initialized lazily to support both app and test contexts
+    lazy var modelContainer: ModelContainer = {
+        do {
+            let schema = Schema([
+                CachedContextProfile.self
+            ])
+            let configuration = ModelConfiguration(
+                schema: schema,
+                isStoredInMemoryOnly: false
+            )
+            return try ModelContainer(
+                for: schema,
+                configurations: [configuration]
+            )
+        } catch {
+            fatalError("Failed to initialize SwiftData ModelContainer: \(error)")
+        }
+    }()
+
+    /// ModelContext for SwiftData operations
+    /// Use this for repository operations that need local persistence
+    var modelContext: ModelContext {
+        modelContainer.mainContext
+    }
 
     private init() {
         // Validate configuration on init

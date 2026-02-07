@@ -100,10 +100,9 @@ struct AdaptiveGlassSheet<Content: View>: View {
 
     var body: some View {
         if #available(iOS 26, *) {
-            GlassEffectContainer {
-                content
-                    .padding(padding)
-            }
+            content
+                .padding(padding)
+                .background(.thickMaterial)
         } else {
             content
                 .padding(padding)
@@ -117,6 +116,9 @@ struct AdaptiveGlassSheet<Content: View>: View {
 
 /// An input-style container with adaptive glass styling.
 /// Designed for text fields and input areas.
+///
+/// - Note: On iOS 26, uses `.glassEffect()` on a background shape to create visible glass.
+///   `GlassEffectContainer` alone doesn't create a visible background - it only groups elements.
 struct AdaptiveGlassInputContainer<Content: View>: View {
 
     let content: Content
@@ -127,11 +129,13 @@ struct AdaptiveGlassInputContainer<Content: View>: View {
 
     var body: some View {
         if #available(iOS 26, *) {
-            GlassEffectContainer {
-                content
-                    .padding(.horizontal, DesignConstants.Spacing.md)
-                    .padding(.vertical, DesignConstants.Spacing.sm)
-            }
+            content
+                .padding(.horizontal, DesignConstants.Spacing.md)
+                .padding(.vertical, DesignConstants.Spacing.sm)
+                .glassEffect(
+                    .regular,
+                    in: RoundedRectangle(cornerRadius: DesignConstants.CornerRadius.input)
+                )
         } else {
             content
                 .padding(.horizontal, DesignConstants.Spacing.md)

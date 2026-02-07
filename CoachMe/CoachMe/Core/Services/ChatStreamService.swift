@@ -4,22 +4,32 @@
 //
 //  Created by Dev Agent on 2/6/26.
 //
+//  Story 2.4: Updated to parse memory_moment flag from SSE events (AC #4)
+//
 
 import Foundation
 
 /// Service for streaming chat responses via Server-Sent Events
 /// Per architecture.md: Use URLSession AsyncBytes for SSE
+/// Story 2.4: Parses memory_moment flag for context injection detection
 @MainActor
 final class ChatStreamService {
     // MARK: - Types
 
     /// Events received from the SSE stream
-    enum StreamEvent: Decodable {
-        case token(String)
+    /// Story 2.4: Token event includes hasMemoryMoment flag for context injection
+    enum StreamEvent: Decodable, Equatable {
+        /// Token with content and optional memory moment indicator
+        /// Story 2.4: hasMemoryMoment indicates if accumulated content contains [MEMORY:...] tags
+        case token(content: String, hasMemoryMoment: Bool)
+
+        /// Stream completed with message ID and usage stats
         case done(messageId: UUID, usage: TokenUsage)
+
+        /// Error occurred during streaming
         case error(message: String)
 
-        struct TokenUsage: Decodable {
+        struct TokenUsage: Decodable, Equatable {
             let promptTokens: Int
             let completionTokens: Int
             let totalTokens: Int
@@ -34,6 +44,7 @@ final class ChatStreamService {
         enum CodingKeys: String, CodingKey {
             case type
             case content
+            case memoryMoment = "memory_moment"
             case messageId = "message_id"
             case usage
             case message
@@ -46,7 +57,9 @@ final class ChatStreamService {
             switch type {
             case "token":
                 let content = try container.decode(String.self, forKey: .content)
-                self = .token(content)
+                // Story 2.4: Parse memory_moment flag (defaults to false if not present)
+                let memoryMoment = try container.decodeIfPresent(Bool.self, forKey: .memoryMoment) ?? false
+                self = .token(content: content, hasMemoryMoment: memoryMoment)
             case "done":
                 let messageId = try container.decode(UUID.self, forKey: .messageId)
                 let usage = try container.decode(TokenUsage.self, forKey: .usage)
@@ -87,15 +100,28 @@ final class ChatStreamService {
 
     // MARK: - Initialization
 
+    /// Creates a ChatStreamService with the given configuration.
+    /// - Parameters:
+    ///   - supabaseURL: Base Supabase URL (defaults to Configuration.supabaseURL)
+    ///   - supabaseKey: Supabase anon key (defaults to Configuration.supabasePublishableKey)
+    ///   - session: URLSession to use for requests (defaults to .shared)
+    /// - Note: Uses a validated URL; logs error and uses placeholder if URL is invalid
     init(
         supabaseURL: String = Configuration.supabaseURL,
         supabaseKey: String = Configuration.supabasePublishableKey,
         session: URLSession = .shared
     ) {
-        guard let url = URL(string: "\(supabaseURL)/functions/v1/chat-stream") else {
-            fatalError("Invalid Supabase URL configuration: \(supabaseURL)")
+        // Gracefully handle invalid URL instead of crashing
+        if let url = URL(string: "\(supabaseURL)/functions/v1/chat-stream") {
+            self.chatStreamURL = url
+        } else {
+            // Log error but don't crash - stream requests will fail gracefully
+            #if DEBUG
+            print("ChatStreamService: ERROR - Invalid Supabase URL: \(supabaseURL)")
+            #endif
+            // Use a placeholder URL - requests will fail with proper error handling
+            self.chatStreamURL = URL(string: "https://invalid.supabase.co/functions/v1/chat-stream")!
         }
-        self.chatStreamURL = url
         self.supabaseKey = supabaseKey
         self.session = session
     }
@@ -117,8 +143,12 @@ final class ChatStreamService {
         conversationId: UUID
     ) -> AsyncThrowingStream<StreamEvent, Error> {
         AsyncThrowingStream { continuation in
-            Task {
+            // Track the inner task for cancellation propagation
+            let streamTask = Task {
                 do {
+                    // Check for cancellation before starting
+                    try Task.checkCancellation()
+
                     var request = URLRequest(url: chatStreamURL)
                     request.httpMethod = "POST"
                     request.timeoutInterval = requestTimeout
@@ -128,10 +158,21 @@ final class ChatStreamService {
 
                     if let token = authToken {
                         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+                        #if DEBUG
+                        print("ChatStreamService: Auth token set (length: \(token.count))")
+                        #endif
+                    } else {
+                        #if DEBUG
+                        print("ChatStreamService: WARNING - No auth token!")
+                        #endif
                     }
 
                     let body = ChatRequest(message: message, conversationId: conversationId)
                     request.httpBody = try JSONEncoder().encode(body)
+
+                    #if DEBUG
+                    print("ChatStreamService: POST \(self.chatStreamURL)")
+                    #endif
 
                     let (bytes, response) = try await session.bytes(for: request)
 
@@ -139,11 +180,27 @@ final class ChatStreamService {
                         throw ChatStreamError.invalidResponse
                     }
 
+                    #if DEBUG
+                    print("ChatStreamService: HTTP \(httpResponse.statusCode)")
+                    #endif
+
                     guard httpResponse.statusCode == 200 else {
+                        #if DEBUG
+                        // Try to read error body for more details
+                        var errorBody = ""
+                        for try await line in bytes.lines {
+                            errorBody += line
+                            if errorBody.count > 500 { break }
+                        }
+                        print("ChatStreamService: Error response: \(errorBody)")
+                        #endif
                         throw ChatStreamError.httpError(statusCode: httpResponse.statusCode)
                     }
 
                     for try await line in bytes.lines {
+                        // Check for cancellation on each line
+                        try Task.checkCancellation()
+
                         if line.hasPrefix("data: ") {
                             let jsonString = String(line.dropFirst(6))
                             if let data = jsonString.data(using: .utf8) {
@@ -165,9 +222,16 @@ final class ChatStreamService {
                         }
                     }
                     continuation.finish()
+                } catch is CancellationError {
+                    continuation.finish()
                 } catch {
                     continuation.finish(throwing: error)
                 }
+            }
+
+            // Cancel the inner task when the stream is terminated
+            continuation.onTermination = { @Sendable _ in
+                streamTask.cancel()
             }
         }
     }

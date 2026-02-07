@@ -184,9 +184,13 @@ actor VoiceInputService {
 
         audioEngine?.stop()
         audioEngine?.inputNode.removeTap(onBus: 0)
+
+        // Signal end of audio input - the recognition task will finish naturally
+        // and deliver a final result. Do NOT call recognitionTask?.cancel() here
+        // as that triggers an error callback instead of a final result.
         recognitionRequest?.endAudio()
-        recognitionTask?.cancel()
-        recognitionTask = nil
+
+        // Clean up references but let the recognition task complete naturally
         recognitionRequest = nil
         audioEngine = nil
         state = .idle

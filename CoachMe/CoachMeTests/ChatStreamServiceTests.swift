@@ -15,7 +15,7 @@ struct ChatStreamServiceTests {
 
     // MARK: - StreamEvent Decoding Tests
 
-    @Test("StreamEvent decodes token event")
+    @Test("StreamEvent decodes token event without memory_moment")
     func testDecodeTokenEvent() throws {
         let json = """
         {"type":"token","content":"Hello"}
@@ -24,8 +24,44 @@ struct ChatStreamServiceTests {
 
         let event = try JSONDecoder().decode(ChatStreamService.StreamEvent.self, from: data)
 
-        if case .token(let content) = event {
+        if case .token(let content, let hasMemoryMoment) = event {
             #expect(content == "Hello")
+            #expect(hasMemoryMoment == false)  // Default when not present
+        } else {
+            Issue.record("Expected token event")
+        }
+    }
+
+    // Story 2.4: Test memory_moment flag parsing (AC #4)
+    @Test("StreamEvent decodes token event with memory_moment true")
+    func testDecodeTokenEventWithMemoryMomentTrue() throws {
+        let json = """
+        {"type":"token","content":"I value [MEMORY: honesty]","memory_moment":true}
+        """
+        let data = json.data(using: .utf8)!
+
+        let event = try JSONDecoder().decode(ChatStreamService.StreamEvent.self, from: data)
+
+        if case .token(let content, let hasMemoryMoment) = event {
+            #expect(content == "I value [MEMORY: honesty]")
+            #expect(hasMemoryMoment == true)
+        } else {
+            Issue.record("Expected token event")
+        }
+    }
+
+    @Test("StreamEvent decodes token event with memory_moment false")
+    func testDecodeTokenEventWithMemoryMomentFalse() throws {
+        let json = """
+        {"type":"token","content":"Regular content","memory_moment":false}
+        """
+        let data = json.data(using: .utf8)!
+
+        let event = try JSONDecoder().decode(ChatStreamService.StreamEvent.self, from: data)
+
+        if case .token(let content, let hasMemoryMoment) = event {
+            #expect(content == "Regular content")
+            #expect(hasMemoryMoment == false)
         } else {
             Issue.record("Expected token event")
         }
@@ -142,8 +178,8 @@ struct ChatStreamServiceTests {
     func testServiceInitialization() {
         let service = ChatStreamService()
 
-        // Should not throw - service initializes successfully
-        #expect(service != nil)
+        // Service initializes successfully - verify it has expected type
+        #expect(type(of: service) == ChatStreamService.self)
     }
 
     @Test("Service accepts custom URL session")
@@ -152,7 +188,8 @@ struct ChatStreamServiceTests {
         let session = URLSession(configuration: config)
         let service = ChatStreamService(session: session)
 
-        #expect(service != nil)
+        // Verify service was created with custom session
+        #expect(type(of: service) == ChatStreamService.self)
     }
 
     // MARK: - Auth Token Tests

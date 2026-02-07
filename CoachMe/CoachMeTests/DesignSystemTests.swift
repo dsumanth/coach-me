@@ -12,6 +12,7 @@ import SwiftUI
 // MARK: - Color Tests
 
 @Suite("Colors Tests")
+@MainActor
 struct ColorsTests {
 
     @Test("Cream color has correct warm RGB values")
@@ -102,6 +103,7 @@ struct ColorsTests {
 // MARK: - Typography Tests
 
 @Suite("Typography Tests")
+@MainActor
 struct TypographyTests {
 
     @Test("All semantic fonts are accessible")
@@ -128,6 +130,7 @@ struct TypographyTests {
 // MARK: - Design Constants Tests
 
 @Suite("DesignConstants Tests")
+@MainActor
 struct DesignConstantsTests {
 
     @Test("Corner radius values are positive")
@@ -192,6 +195,7 @@ struct DesignConstantsTests {
 // MARK: - WarmErrorMessages Tests
 
 @Suite("WarmErrorMessages Tests")
+@MainActor
 struct WarmErrorMessagesTests {
 
     @Test("Error messages use first-person voice")
@@ -254,10 +258,10 @@ struct WarmErrorMessagesTests {
 // MARK: - DesignSystem Integration Tests
 
 @Suite("DesignSystem Integration Tests")
+@MainActor
 struct DesignSystemIntegrationTests {
 
     @Test("DesignSystem Colors references match Color extension")
-    @MainActor
     func colorReferencesMatch() {
         #expect(DesignSystem.Colors.cream == Color.cream)
         #expect(DesignSystem.Colors.terracotta == Color.terracotta)
@@ -266,7 +270,6 @@ struct DesignSystemIntegrationTests {
     }
 
     @Test("DesignSystem adaptive color accessors work")
-    @MainActor
     func adaptiveColorAccessors() {
         let lightBg = DesignSystem.Colors.background(for: .light)
         let darkBg = DesignSystem.Colors.background(for: .dark)
@@ -281,6 +284,7 @@ struct DesignSystemIntegrationTests {
 // MARK: - Accessibility Color Contrast Tests
 
 @Suite("Accessibility Color Contrast Tests")
+@MainActor
 struct AccessibilityColorContrastTests {
 
     @Test("Primary text contrasts with backgrounds in light mode")

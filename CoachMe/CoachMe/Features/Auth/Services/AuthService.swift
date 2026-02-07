@@ -86,14 +86,48 @@ final class AuthService {
         }
     }
 
-    /// Get the current access token (for API requests)
+    /// Get the current user ID from the session
     /// Returns nil if no valid session exists
-    var currentAccessToken: String? {
+    var currentUserId: UUID? {
         get async {
             do {
                 let session = try await supabase.auth.session
+                return session.user.id
+            } catch {
+                #if DEBUG
+                print("AuthService: Failed to get user ID: \(error.localizedDescription)")
+                #endif
+                return nil
+            }
+        }
+    }
+
+    /// Get the current access token (for API requests)
+    /// Returns nil if no valid session exists
+    /// Note: This refreshes the session if expired to ensure a valid token
+    var currentAccessToken: String? {
+        get async {
+            do {
+                // First try to get existing session
+                let session = try await supabase.auth.session
+
+                // Check if token is expired and refresh if needed
+                // The session.expiresAt is Unix timestamp
+                if session.expiresAt < Date().timeIntervalSince1970 {
+                    #if DEBUG
+                    print("AuthService: Access token expired, refreshing...")
+                    #endif
+
+                    // Force refresh the session
+                    let refreshedSession = try await supabase.auth.refreshSession()
+                    return refreshedSession.accessToken
+                }
+
                 return session.accessToken
             } catch {
+                #if DEBUG
+                print("AuthService: Failed to get access token: \(error.localizedDescription)")
+                #endif
                 return nil
             }
         }
@@ -211,6 +245,10 @@ final class AuthService {
                 }
             }
 
+            // Ensure context profile exists (Story 2.1)
+            // Non-blocking: profile creation failure shouldn't break auth
+            await ensureContextProfileExists(userId: session.user.id)
+
             #if DEBUG
             print("Successfully signed in user: \(session.user.id)")
             #endif
@@ -314,6 +352,39 @@ final class AuthService {
         }
 
         return parts.isEmpty ? nil : parts.joined(separator: " ")
+    }
+
+    // MARK: - Context Profile Integration (Story 2.1)
+
+    /// Ensures a context profile exists for the user
+    /// Creates one if it doesn't exist, does nothing if it does
+    /// This is non-blocking - failures won't affect authentication
+    private func ensureContextProfileExists(userId: UUID) async {
+        let repository = ContextRepository.shared
+
+        // Check if profile already exists
+        let exists = await repository.profileExists(userId: userId)
+        if exists {
+            #if DEBUG
+            print("AuthService: Context profile already exists for user \(userId)")
+            #endif
+            return
+        }
+
+        // Create new profile
+        do {
+            _ = try await repository.createProfile(for: userId)
+
+            #if DEBUG
+            print("AuthService: Created context profile for user \(userId)")
+            #endif
+        } catch {
+            // Non-fatal: profile creation failure shouldn't block sign-in
+            // Profile can be created later when user accesses context features
+            #if DEBUG
+            print("AuthService: Failed to create context profile (non-fatal): \(error.localizedDescription)")
+            #endif
+        }
     }
 }
 

@@ -8,6 +8,7 @@
 import XCTest
 @testable import CoachMe
 
+@MainActor
 final class ConfigurationTests: XCTestCase {
 
     func testEnvironmentDefaultsToDevelopment() {
@@ -23,14 +24,21 @@ final class ConfigurationTests: XCTestCase {
         XCTAssertNotNil(url, "Supabase URL should be a valid URL")
     }
 
-    func testSupabaseAnonKeyIsNotEmpty() {
-        XCTAssertFalse(Configuration.supabaseAnonKey.isEmpty)
+    func testSupabasePublishableKeyIsNotEmpty() {
+        XCTAssertFalse(Configuration.supabasePublishableKey.isEmpty)
     }
 
-    func testValidateConfigurationDetectsPlaceholders() {
-        // In development with placeholders, validation should return false
+    func testValidateConfigurationPassesInDevelopment() {
+        // In development with real credentials, validation should pass
         let isValid = Configuration.validateConfiguration()
-        // This will be false until real credentials are added
-        XCTAssertFalse(isValid, "Placeholder credentials should not pass validation")
+        XCTAssertTrue(isValid, "Development credentials should pass validation")
+    }
+
+    func testSupabaseURLContainsSupabaseDomain() {
+        XCTAssertTrue(Configuration.supabaseURL.contains("supabase.co"))
+    }
+
+    func testSupabaseKeyHasCorrectPrefix() {
+        XCTAssertTrue(Configuration.supabasePublishableKey.hasPrefix("sb_publishable_"))
     }
 }

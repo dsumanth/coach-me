@@ -12,19 +12,25 @@ export async function verifyAuth(req: Request): Promise<{ userId: string; supaba
 
   const jwt = authHeader.replace('Bearer ', '');
 
+  // Use apikey from request header to support new publishable key format
+  // See: https://github.com/supabase/supabase/issues/37648
+  const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+  const supabaseKey = req.headers.get('apikey') || (Deno.env.get('SUPABASE_ANON_KEY') ?? '');
+
   const supabase = createClient(
-    Deno.env.get('SUPABASE_URL') ?? '',
-    Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+    supabaseUrl,
+    supabaseKey,
     {
       global: { headers: { Authorization: `Bearer ${jwt}` } },
       auth: { persistSession: false },
     }
   );
 
-  const { data: { user }, error } = await supabase.auth.getUser();
+  const { data: { user }, error } = await supabase.auth.getUser(jwt);
 
   if (error || !user) {
-    throw new Error('Invalid or expired token');
+    console.error('Auth error:', error?.message, error?.status);
+    throw new Error(`Invalid or expired token: ${error?.message}`);
   }
 
   return { userId: user.id, supabase };

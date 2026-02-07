@@ -50,6 +50,17 @@ extension Color {
     /// Subtle highlight - very light warm
     static let subtleHighlight = Color(red: 255/255, green: 251/255, blue: 235/255)
 
+    /// Memory moment peach - UX-4 memory highlight
+    /// #FFEDD5 (254, 237, 213) - warm peach cream for personalized moments
+    static let memoryPeach = Color(red: 254/255, green: 237/255, blue: 213/255)
+
+    /// Memory moment indicator - subtle terracotta (light mode)
+    static let memoryIndicator = Color(red: 194/255, green: 65/255, blue: 12/255).opacity(0.6)
+
+    /// Memory moment indicator for dark mode - warm gold (distinct from warningAmber)
+    /// #D4A574 (212, 165, 116) - softer, more muted gold that reads as "memory" not "warning"
+    static let memoryIndicatorDark = Color(red: 212/255, green: 165/255, blue: 116/255)
+
     // MARK: - Dark Mode Surface Colors
 
     /// Light surface in dark mode

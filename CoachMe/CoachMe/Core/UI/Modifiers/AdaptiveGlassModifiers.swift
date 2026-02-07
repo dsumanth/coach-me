@@ -74,7 +74,9 @@ extension View {
     @ViewBuilder
     func adaptiveGlassSheet() -> some View {
         if #available(iOS 26, *) {
-            self.glassEffect()
+            // .glassEffect() creates a squircle shape inside the sheet — use material instead.
+            // The sheet presentation handles its own corner radius on iOS 26.
+            self.background(.thickMaterial)
         } else {
             self.background(.thickMaterial)
                 .clipShape(RoundedRectangle(cornerRadius: DesignConstants.CornerRadius.sheet))

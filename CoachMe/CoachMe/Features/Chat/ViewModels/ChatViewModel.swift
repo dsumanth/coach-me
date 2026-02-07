@@ -4,11 +4,15 @@
 //
 //  Created by Sumanth Daggubati on 2/6/26.
 //
+//  Story 2.4: Updated to track memory moments from streaming responses (AC #4)
+//
 
 import Foundation
+import UIKit  // For UIAccessibility announcements
 
 /// ViewModel for chat screen
 /// Per architecture.md: Use @Observable for ViewModels (not @ObservableObject)
+/// Story 2.4: Tracks memory moments detected during streaming
 @MainActor
 @Observable
 final class ChatViewModel {
@@ -29,11 +33,24 @@ final class ChatViewModel {
     /// Content being streamed (for in-progress message)
     var streamingContent: String = ""
 
+    /// Story 2.4: Whether the current streaming response contains memory moments
+    /// Note: Currently tracked for state consistency. Can be used in future to:
+    /// - Show a "personalized response" indicator in the UI
+    /// - Track analytics on memory moment frequency
+    /// - Trigger haptic feedback when memory is referenced
+    var currentResponseHasMemoryMoments = false
+
     /// Current error (if any)
     var error: ChatError?
 
     /// Whether to show the error alert
     var showError = false
+
+    /// Whether to show the delete confirmation alert (Story 2.6)
+    var showDeleteConfirmation = false
+
+    /// Whether a deletion is in progress (Story 2.6)
+    var isDeleting = false
 
     /// Whether retry is available (partial content exists from failed stream)
     var canRetry: Bool {
@@ -43,7 +60,10 @@ final class ChatViewModel {
     // MARK: - Private State
 
     /// Current conversation identifier
-    private var currentConversationId: UUID?
+    private(set) var currentConversationId: UUID?
+
+    /// Whether the current conversation has been persisted to DB
+    private var isConversationPersisted = false
 
     /// Current in-flight send task (for cancellation)
     private var currentSendTask: Task<Void, Never>?
@@ -62,10 +82,17 @@ final class ChatViewModel {
     /// Chat stream service for SSE communication
     private let chatStreamService: ChatStreamService
 
+    /// Conversation service for database operations
+    private let conversationService: any ConversationServiceProtocol
+
     // MARK: - Initialization
 
-    init(chatStreamService: ChatStreamService = ChatStreamService()) {
+    init(
+        chatStreamService: ChatStreamService = ChatStreamService(),
+        conversationService: any ConversationServiceProtocol = ConversationService.shared
+    ) {
         self.chatStreamService = chatStreamService
+        self.conversationService = conversationService
         self.tokenBuffer = StreamingTokenBuffer()
         self.currentConversationId = UUID()
 
@@ -104,6 +131,7 @@ final class ChatViewModel {
         isLoading = true
         isStreaming = false
         streamingContent = ""
+        currentResponseHasMemoryMoments = false  // Story 2.4: Reset memory moment tracking
         tokenBuffer?.reset()
 
         // Create a tracked task for cancellation support
@@ -116,6 +144,12 @@ final class ChatViewModel {
                 // Refresh auth token before streaming (handles token refresh during session)
                 await refreshAuthToken()
 
+                // Ensure conversation exists in database before sending (P0 fix)
+                if !isConversationPersisted {
+                    _ = try await conversationService.ensureConversationExists(id: conversationId)
+                    isConversationPersisted = true
+                }
+
                 // Start streaming after brief delay for typing indicator UX
                 isStreaming = true
 
@@ -126,8 +160,12 @@ final class ChatViewModel {
                     try Task.checkCancellation()
 
                     switch event {
-                    case .token(let content):
+                    case .token(let content, let hasMemoryMoment):
                         tokenBuffer?.addToken(content)
+                        // Story 2.4: Track if response contains memory moments (AC #4)
+                        if hasMemoryMoment {
+                            currentResponseHasMemoryMoments = true
+                        }
 
                     case .done(let messageId, _):
                         tokenBuffer?.flush()
@@ -154,12 +192,53 @@ final class ChatViewModel {
                         showError = true
                     }
                 }
+
+                // Safety: ensure isStreaming is reset if stream ended without .done event
+                // This handles edge cases like malformed done events or unexpected stream termination
+                if isStreaming {
+                    tokenBuffer?.flush()
+                    isStreaming = false
+
+                    // If we have partial content, create a message from it
+                    if !streamingContent.isEmpty {
+                        let assistantMessage = ChatMessage(
+                            id: currentStreamMessageId ?? UUID(),
+                            conversationId: conversationId,
+                            role: .assistant,
+                            content: streamingContent,
+                            createdAt: Date()
+                        )
+                        messages.append(assistantMessage)
+                        streamingContent = ""
+                        lastUserMessageContent = nil
+                    }
+                }
             } catch is CancellationError {
                 tokenBuffer?.flush()
                 isStreaming = false
                 #if DEBUG
                 print("ChatViewModel: Stream cancelled")
                 #endif
+            } catch let convError as ConversationService.ConversationError {
+                // Handle conversation-specific errors
+                tokenBuffer?.flush()
+                isStreaming = false
+                if case .notAuthenticated = convError {
+                    self.error = .sessionExpired
+                } else {
+                    self.error = .messageFailed(convError)
+                }
+                showError = true
+            } catch let streamError as ChatStreamError {
+                // Handle stream-specific errors with proper mapping
+                tokenBuffer?.flush()
+                isStreaming = false
+                if case .httpError(let statusCode) = streamError, statusCode == 401 {
+                    self.error = .sessionExpired
+                } else {
+                    self.error = .messageFailed(streamError)
+                }
+                showError = true
             } catch {
                 tokenBuffer?.flush()
                 isStreaming = false
@@ -206,9 +285,11 @@ final class ChatViewModel {
         currentSendTask?.cancel()
         messages = []
         currentConversationId = UUID()
+        isConversationPersisted = false  // Reset so new conversation will be created in DB
         inputText = ""
         streamingContent = ""
         isStreaming = false
+        currentResponseHasMemoryMoments = false  // Story 2.4: Reset memory moment tracking
         tokenBuffer?.reset()
         lastUserMessageContent = nil
         error = nil
@@ -228,6 +309,49 @@ final class ChatViewModel {
         try? await Task.sleep(nanoseconds: 500_000_000)
     }
 
+    // MARK: - Conversation Deletion (Story 2.6)
+
+    /// Deletes the current conversation and resets to empty state
+    /// - Returns: true if deletion succeeded, false otherwise
+    @discardableResult
+    func deleteConversation() async -> Bool {
+        guard let conversationId = currentConversationId, isConversationPersisted else {
+            // Conversation was never saved to DB, just start fresh
+            startNewConversation()
+            // Announce for VoiceOver users
+            UIAccessibility.post(notification: .announcement, argument: "Conversation removed")
+            return true
+        }
+
+        isDeleting = true
+        defer { isDeleting = false }
+
+        do {
+            try await conversationService.deleteConversation(id: conversationId)
+
+            #if DEBUG
+            print("ChatViewModel: Conversation deleted, starting fresh")
+            #endif
+
+            // Reset to empty state (Task 2.3)
+            startNewConversation()
+
+            // Announce deletion completion for VoiceOver users (Story 2.6 - Accessibility)
+            UIAccessibility.post(notification: .announcement, argument: "Conversation removed")
+
+            return true
+        } catch let convError as ConversationService.ConversationError {
+            // Handle conversation-specific errors with warm messages (Task 2.4)
+            self.error = .messageFailed(convError)
+            showError = true
+            return false
+        } catch {
+            self.error = .messageFailed(error)
+            showError = true
+            return false
+        }
+    }
+
     // MARK: - Auth Token Management
 
     /// Sets the auth token on the chat stream service
@@ -240,6 +364,15 @@ final class ChatViewModel {
     /// Ensures token is current even after refresh during session
     private func refreshAuthToken() async {
         let token = await AuthService.shared.currentAccessToken
+
+        #if DEBUG
+        if let token = token {
+            print("ChatViewModel: Auth token refreshed (length: \(token.count))")
+        } else {
+            print("ChatViewModel: WARNING - No auth token available!")
+        }
+        #endif
+
         chatStreamService.setAuthToken(token)
     }
 }

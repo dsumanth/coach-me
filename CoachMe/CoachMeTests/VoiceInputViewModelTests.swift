@@ -5,6 +5,7 @@
 //  Created by Dev Agent on 2/6/26.
 //
 
+import Foundation
 import Testing
 @testable import CoachMe
 

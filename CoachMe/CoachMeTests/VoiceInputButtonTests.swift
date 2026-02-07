@@ -27,7 +27,8 @@ struct VoiceInputButtonTests {
             onRelease: { releaseCalled = true }
         )
 
-        // Verify button can be created with correct state
+        // Verify button is in idle state and callbacks not triggered on creation
+        #expect(!button.isRecording)
         #expect(!pressCalled)
         #expect(!releaseCalled)
     }
