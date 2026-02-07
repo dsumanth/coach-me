@@ -5,6 +5,7 @@
 //  Created by Dev Agent on 2/6/26.
 //
 //  Story 2.4: Updated to detect and highlight memory moments during streaming
+//  Story 3.4: Updated to detect and highlight pattern insights during streaming
 //
 
 import SwiftUI
@@ -12,6 +13,7 @@ import SwiftUI
 /// View that renders streaming text with smooth buffered display
 /// Per UX spec: 50-100ms buffer for coaching-paced rendering
 /// Story 2.4: Detects and highlights memory moments in real-time
+/// Story 3.4: Also detects and highlights pattern insights in real-time
 struct StreamingText: View {
     /// The accumulated text to display
     let text: String
@@ -27,7 +29,7 @@ struct StreamingText: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(alignment: .bottom, spacing: 0) {
-                // Story 2.4: Parse and display text with memory moments stripped
+                // Story 3.4: Parse all tags (memory + pattern) and display clean text
                 Text(parsedResult.cleanText)
                     .font(.body)
                     .foregroundColor(Color.adaptiveText(colorScheme))
@@ -48,9 +50,9 @@ struct StreamingText: View {
                 }
             }
 
-            // Story 2.4: Show memory moments with visual treatment
-            if parsedResult.hasMemoryMoments {
-                memoryMomentsSection
+            // Story 2.4 + 3.4: Show coaching tags with type-specific visual treatment
+            if !parsedResult.tags.isEmpty {
+                coachingTagsSection
             }
         }
         .onChange(of: isStreaming) { _, newValue in
@@ -62,23 +64,28 @@ struct StreamingText: View {
         }
     }
 
-    // MARK: - Memory Moment Detection
+    // MARK: - Tag Detection (Story 3.4)
 
-    /// Parsed result with clean text and detected memory moments
-    private var parsedResult: MemoryParseResult {
-        MemoryMomentParser.parse(text)
+    /// Parsed result with clean text and all detected coaching tags
+    private var parsedResult: TagParseResult {
+        MemoryMomentParser.parseAll(text)
     }
 
-    /// Visual section showing detected memory moments
+    /// Visual section showing detected coaching tags (memory moments + pattern insights)
     @ViewBuilder
-    private var memoryMomentsSection: some View {
-        FlowLayout(spacing: 6) {
-            ForEach(parsedResult.moments) { moment in
-                MemoryMomentText(content: moment.content)
+    private var coachingTagsSection: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            ForEach(parsedResult.tags) { tag in
+                switch tag.type {
+                case .memory:
+                    MemoryMomentText(content: tag.content)
+                case .pattern:
+                    PatternInsightText(content: tag.content)
+                }
             }
         }
         .transition(.opacity.combined(with: .scale(scale: 0.95)))
-        .animation(.easeInOut(duration: 0.2), value: parsedResult.moments.count)
+        .animation(.easeInOut(duration: 0.2), value: parsedResult.tags.count)
     }
 
     // MARK: - Private Methods

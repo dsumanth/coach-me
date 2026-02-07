@@ -1,6 +1,6 @@
 # Story 3.6: Multiple Conversation Threads
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -24,50 +24,50 @@ so that **I can keep threads organized and return to past coaching sessions**.
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Add fetch and delete methods to ConversationService (AC: #2, #3, #4)
-  - [ ] 1.1 Add `fetchConversations() async throws -> [Conversation]` to `ConversationServiceProtocol` — fetch all conversations for the current user, ordered by `last_message_at DESC`
-  - [ ] 1.2 Add `fetchMessages(conversationId: UUID) async throws -> [ChatMessage]` — fetch all messages for a given conversation
-  - [ ] 1.3 Add `deleteConversation(id: UUID) async throws` to `ConversationServiceProtocol` — delete a conversation and its messages (AC: #4)
-  - [ ] 1.4 Implement all methods in `ConversationService` using Supabase REST queries with RLS (DELETE with cascade for deletion)
+- [x] Task 1: Add fetch and delete methods to ConversationService (AC: #2, #3, #4)
+  - [x] 1.1 Add `fetchConversations() async throws -> [Conversation]` to `ConversationServiceProtocol` — fetch all conversations for the current user, ordered by `last_message_at DESC`
+  - [x] 1.2 Add `fetchMessages(conversationId: UUID) async throws -> [ChatMessage]` — fetch all messages for a given conversation
+  - [x] 1.3 Add `deleteConversation(id: UUID) async throws` to `ConversationServiceProtocol` — delete a conversation and its messages (AC: #4)
+  - [x] 1.4 Implement all methods in `ConversationService` using Supabase REST queries with RLS (DELETE with cascade for deletion)
 
-- [ ] Task 2: Create ConversationListViewModel (AC: #2, #4, #5)
-  - [ ] 2.1 Create `Features/History/ViewModels/ConversationListViewModel.swift` — `@MainActor @Observable` class
-  - [ ] 2.2 Properties: `conversations: [Conversation]`, `isLoading: Bool`, `error: ConversationError?`
-  - [ ] 2.3 Methods: `loadConversations()`, `deleteConversation(id:)`, `refreshConversations()`
-  - [ ] 2.4 Call `ConversationService.shared.fetchConversations()` for data
+- [x] Task 2: Create ConversationListViewModel (AC: #2, #4, #5)
+  - [x] 2.1 Create `Features/History/ViewModels/ConversationListViewModel.swift` — `@MainActor @Observable` class
+  - [x] 2.2 Properties: `conversations: [Conversation]`, `isLoading: Bool`, `error: ConversationError?`
+  - [x] 2.3 Methods: `loadConversations()`, `deleteConversation(id:)`, `refreshConversations()`
+  - [x] 2.4 Call `ConversationService.shared.fetchConversations()` for data
 
-- [ ] Task 3: Create ConversationListView (AC: #2, #4, #5)
-  - [ ] 3.1 Create `Features/History/Views/ConversationListView.swift` — SwiftUI List with adaptive styling
-  - [ ] 3.2 Create `Features/History/Views/ConversationRow.swift` — row component showing domain badge, title/preview, relative timestamp, message count
-  - [ ] 3.3 Add swipe-to-delete with warm confirmation alert (UX-11: "This will remove our conversation. You sure?")
-  - [ ] 3.4 Add empty state when no conversations exist ("No conversations yet. Start one!")
-  - [ ] 3.5 Apply `.adaptiveGlass()` to navigation elements, NOT to content rows
-  - [ ] 3.6 Ensure VoiceOver accessibility labels on all interactive elements
+- [x] Task 3: Create ConversationListView (AC: #2, #4, #5)
+  - [x] 3.1 Create `Features/History/Views/ConversationListView.swift` — SwiftUI List with adaptive styling
+  - [x] 3.2 Create `Features/History/Views/ConversationRow.swift` — row component showing domain badge, title/preview, relative timestamp, message count
+  - [x] 3.3 Add swipe-to-delete with warm confirmation alert (UX-11: "This will remove our conversation. You sure?")
+  - [x] 3.4 Add empty state when no conversations exist ("No conversations yet. Start one!")
+  - [x] 3.5 Apply `.adaptiveGlass()` to navigation elements, NOT to content rows
+  - [x] 3.6 Ensure VoiceOver accessibility labels on all interactive elements
 
-- [ ] Task 4: Create domain badge component (AC: #5)
-  - [ ] 4.1 Create a `DomainBadge.swift` component in `Core/UI/Components/` — small pill/tag showing domain name with domain-specific color
-  - [ ] 4.2 Define a `CoachingDomain` enum (or constants) in `Core/Models/` centralizing the 7 known domains ("life", "career", "relationships", "mindset", "creativity", "fitness", "leadership") with display names and colors from `Colors.swift`
-  - [ ] 4.3 Handle nil domain: show no badge (omit entirely). Handle unknown-but-not-nil domain: show raw domain string capitalized with a neutral/default color
+- [x] Task 4: Create domain badge component (AC: #5)
+  - [x] 4.1 Create a `DomainBadge.swift` component in `Core/UI/Components/` — small pill/tag showing domain name with domain-specific color
+  - [x] 4.2 Define a `CoachingDomain` enum (or constants) in `Core/Models/` centralizing the 7 known domains ("life", "career", "relationships", "mindset", "creativity", "fitness", "leadership") with display names and colors from `Colors.swift`
+  - [x] 4.3 Handle nil domain: show no badge (omit entirely). Handle unknown-but-not-nil domain: show raw domain string capitalized with a neutral/default color
 
-- [ ] Task 5: Update Router for conversation list navigation (AC: #2, #3)
-  - [ ] 5.1 Add `.conversationList` case to `Router.Screen` enum
-  - [ ] 5.2 Add `navigateToConversationList()` and `navigateToChat(conversationId: UUID?)` methods
-  - [ ] 5.3 Update `RootView.swift` to handle `.conversationList` screen rendering
+- [x] Task 5: Update Router for conversation list navigation (AC: #2, #3)
+  - [x] 5.1 Add `.conversationList` case to `Router.Screen` enum
+  - [x] 5.2 Add `navigateToConversationList()` and `navigateToChat(conversationId: UUID?)` methods
+  - [x] 5.3 Update `RootView.swift` to handle `.conversationList` screen rendering
 
-- [ ] Task 6: Update ChatViewModel for conversation switching (AC: #1, #3)
-  - [ ] 6.1 Add `loadConversation(id: UUID) async` method — fetches messages for an existing conversation via `ConversationService.fetchMessages(conversationId:)` and sets `currentConversationId`
-  - [ ] 6.2 Modify `startNewConversation()` to properly reset state (clear messages, generate new UUID, set `isConversationPersisted = false`)
-  - [ ] 6.3 Ensure `sendMessage()` still calls `ensureConversationExists()` before first message in a new thread
+- [x] Task 6: Update ChatViewModel for conversation switching (AC: #1, #3)
+  - [x] 6.1 Add `loadConversation(id: UUID) async` method — fetches messages for an existing conversation via `ConversationService.fetchMessages(conversationId:)` and sets `currentConversationId`
+  - [x] 6.2 Modify `startNewConversation()` to properly reset state (clear messages, generate new UUID, set `isConversationPersisted = false`)
+  - [x] 6.3 Ensure `sendMessage()` still calls `ensureConversationExists()` before first message in a new thread
 
-- [ ] Task 7: Wire up ChatView toolbar actions (AC: #1, #2)
-  - [ ] 7.1 Replace the "History coming soon" toast with actual navigation to `ConversationListView` via Router
-  - [ ] 7.2 Ensure "New Conversation" button calls `startNewConversation()` and stays on ChatView with empty state
-  - [ ] 7.3 Handle back navigation from ConversationListView → ChatView when a conversation is selected
+- [x] Task 7: Wire up ChatView toolbar actions (AC: #1, #2)
+  - [x] 7.1 Replace the "History coming soon" toast with actual navigation to `ConversationListView` via Router
+  - [x] 7.2 Ensure "New Conversation" button calls `startNewConversation()` and stays on ChatView with empty state
+  - [x] 7.3 Handle back navigation from ConversationListView → ChatView when a conversation is selected
 
-- [ ] Task 8: Write unit tests (All ACs)
-  - [ ] 8.1 `ConversationListViewModelTests` — test load, delete, error handling
-  - [ ] 8.2 `ChatViewModelTests` — test `loadConversation(id:)`, test `startNewConversation()` preserves previous conversation
-  - [ ] 8.3 `ConversationServiceTests` — test `fetchConversations()`, `fetchMessages(conversationId:)`
+- [x] Task 8: Write unit tests (All ACs)
+  - [x] 8.1 `ConversationListViewModelTests` — test load, delete, error handling
+  - [x] 8.2 `ChatViewModelTests` — test `loadConversation(id:)`, test `startNewConversation()` preserves previous conversation
+  - [x] 8.3 `ConversationServiceTests` — test `fetchConversations()`, `fetchMessages(conversationId:)`
 
 ## Dev Notes
 
@@ -172,15 +172,44 @@ Recent commits (4 total):
 
 ### Agent Model Used
 
-
+Claude Opus 4.6
 
 ### Debug Log References
 
-
+- Build succeeded with all new files auto-discovered via PBXFileSystemSynchronizedRootGroup
+- Resolved naming conflict: removed duplicate CoachingDomain.swift from Core/Models/ — existing one in Core/Constants/ already had all needed properties
 
 ### Completion Notes List
 
+- Task 1: Added `fetchConversations()` and `fetchMessages(conversationId:)` to ConversationServiceProtocol and ConversationService. Added `fetchFailed` error case with warm UX-11 messaging.
+- Task 2: Created ConversationListViewModel with @MainActor @Observable, load/refresh/delete operations, and error handling via mock-injectable ConversationServiceProtocol.
+- Task 3: Created ConversationListView with navigation bar, conversation list, swipe-to-delete with warm confirmation ("This will remove our conversation. You sure?"), empty state, and loading state. Created ConversationRow with domain indicator dot, title, relative timestamp, domain badge, and message count.
+- Task 4: Created DomainBadge reusable component using existing CoachingDomain enum. Handles known domains (with color), unknown non-nil domains (capitalized, neutral color), and nil domains (renders nothing).
+- Task 5: Added `.conversationList` screen case to Router. Added `selectedConversationId` property and `navigateToChat(conversationId:)` / `navigateToConversationList()` methods. Updated RootView to render ConversationListView.
+- Task 6: Added `loadConversation(id:)` to ChatViewModel — fetches messages, sets conversation as persisted, resets all UI state. Updated `startNewConversation()` unchanged (already generates new UUID).
+- Task 7: Replaced "History coming soon" toast with actual Router navigation to ConversationListView. Added `.task` handler to load selected conversation from router when returning from list. Removed dead toast code.
+- Task 8: Created ConversationListViewModelTests (15 tests). Extended ChatViewModelTests with 5 conversation switching tests. Extended ConversationServiceTests with fetchFailed error test and 4 mock-based fetch tests. Updated MockConversationService with fetch method support.
 
+### Change Log
+
+- 2026-02-07: Story 3.6 implementation complete — all 8 tasks, all ACs addressed
 
 ### File List
+
+**New Files:**
+- CoachMe/Features/History/ViewModels/ConversationListViewModel.swift
+- CoachMe/Features/History/Views/ConversationListView.swift
+- CoachMe/Features/History/Views/ConversationRow.swift
+- CoachMe/Core/UI/Components/DomainBadge.swift
+- CoachMeTests/ConversationListViewModelTests.swift
+
+**Modified Files:**
+- CoachMe/Core/Services/ConversationService.swift — Added fetchConversations(), fetchMessages(), fetchFailed error case
+- CoachMe/Features/Chat/ViewModels/ChatViewModel.swift — Added loadConversation(id:)
+- CoachMe/Features/Chat/Views/ChatView.swift — Replaced history toast with real navigation, added conversation loading from router
+- CoachMe/App/Navigation/Router.swift — Added .conversationList screen, selectedConversationId, navigation methods
+- CoachMe/App/Navigation/RootView.swift — Added .conversationList case rendering
+- CoachMeTests/Mocks/MockConversationService.swift — Added fetch method support
+- CoachMeTests/ChatViewModelTests.swift — Added 5 conversation switching tests
+- CoachMeTests/ConversationServiceTests.swift — Added fetchFailed error test and 4 fetch mock tests
 

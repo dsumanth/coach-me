@@ -3,6 +3,7 @@
 //  CoachMeTests
 //
 //  Created by Dev Agent on 2/6/26.
+//  Story 3.4: Extended with pattern_insight flag decoding tests
 //
 
 import Testing
@@ -15,7 +16,7 @@ struct ChatStreamServiceTests {
 
     // MARK: - StreamEvent Decoding Tests
 
-    @Test("StreamEvent decodes token event without memory_moment")
+    @Test("StreamEvent decodes token event without memory_moment or pattern_insight")
     func testDecodeTokenEvent() throws {
         let json = """
         {"type":"token","content":"Hello"}
@@ -24,9 +25,10 @@ struct ChatStreamServiceTests {
 
         let event = try JSONDecoder().decode(ChatStreamService.StreamEvent.self, from: data)
 
-        if case .token(let content, let hasMemoryMoment) = event {
+        if case .token(let content, let hasMemoryMoment, let hasPatternInsight) = event {
             #expect(content == "Hello")
             #expect(hasMemoryMoment == false)  // Default when not present
+            #expect(hasPatternInsight == false)  // Story 3.4: Default when not present
         } else {
             Issue.record("Expected token event")
         }
@@ -42,9 +44,10 @@ struct ChatStreamServiceTests {
 
         let event = try JSONDecoder().decode(ChatStreamService.StreamEvent.self, from: data)
 
-        if case .token(let content, let hasMemoryMoment) = event {
+        if case .token(let content, let hasMemoryMoment, let hasPatternInsight) = event {
             #expect(content == "I value [MEMORY: honesty]")
             #expect(hasMemoryMoment == true)
+            #expect(hasPatternInsight == false)  // Story 3.4: Not a pattern insight
         } else {
             Issue.record("Expected token event")
         }
@@ -59,9 +62,10 @@ struct ChatStreamServiceTests {
 
         let event = try JSONDecoder().decode(ChatStreamService.StreamEvent.self, from: data)
 
-        if case .token(let content, let hasMemoryMoment) = event {
+        if case .token(let content, let hasMemoryMoment, let hasPatternInsight) = event {
             #expect(content == "Regular content")
             #expect(hasMemoryMoment == false)
+            #expect(hasPatternInsight == false)
         } else {
             Issue.record("Expected token event")
         }
@@ -201,5 +205,60 @@ struct ChatStreamServiceTests {
         // Should not throw
         service.setAuthToken("test-token")
         service.setAuthToken(nil)
+    }
+
+    // MARK: - Story 3.4: Pattern Insight Flag Tests
+
+    @Test("StreamEvent decodes pattern_insight flag true")
+    func testDecodePatternInsightTrue() throws {
+        let json = """
+        {"type":"token","content":"I noticed [PATTERN: stuck before transitions]","memory_moment":false,"pattern_insight":true}
+        """
+        let data = json.data(using: .utf8)!
+
+        let event = try JSONDecoder().decode(ChatStreamService.StreamEvent.self, from: data)
+
+        if case .token(let content, let hasMemoryMoment, let hasPatternInsight) = event {
+            #expect(content == "I noticed [PATTERN: stuck before transitions]")
+            #expect(hasMemoryMoment == false)
+            #expect(hasPatternInsight == true)
+        } else {
+            Issue.record("Expected token event")
+        }
+    }
+
+    @Test("StreamEvent backward compatibility - missing pattern_insight defaults to false")
+    func testDecodePatternInsightBackwardCompat() throws {
+        // Pre-3.4 SSE events don't have pattern_insight field
+        let json = """
+        {"type":"token","content":"Some text","memory_moment":true}
+        """
+        let data = json.data(using: .utf8)!
+
+        let event = try JSONDecoder().decode(ChatStreamService.StreamEvent.self, from: data)
+
+        if case .token(_, let hasMemoryMoment, let hasPatternInsight) = event {
+            #expect(hasMemoryMoment == true)
+            #expect(hasPatternInsight == false)  // Defaults to false
+        } else {
+            Issue.record("Expected token event")
+        }
+    }
+
+    @Test("StreamEvent decodes both memory_moment and pattern_insight true")
+    func testDecodeBothMemoryAndPatternTrue() throws {
+        let json = """
+        {"type":"token","content":"With both tags","memory_moment":true,"pattern_insight":true}
+        """
+        let data = json.data(using: .utf8)!
+
+        let event = try JSONDecoder().decode(ChatStreamService.StreamEvent.self, from: data)
+
+        if case .token(_, let hasMemoryMoment, let hasPatternInsight) = event {
+            #expect(hasMemoryMoment == true)
+            #expect(hasPatternInsight == true)
+        } else {
+            Issue.record("Expected token event")
+        }
     }
 }

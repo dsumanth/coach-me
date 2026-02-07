@@ -18,15 +18,28 @@ final class Router {
         case welcome
         /// Main chat screen (authenticated)
         case chat
+        /// Conversation list/history screen (Story 3.6)
+        case conversationList
     }
 
     /// Current active screen
     var currentScreen: Screen = .welcome
 
+    /// Conversation ID to load when navigating back to chat from conversation list
+    var selectedConversationId: UUID?
+
     // MARK: - Navigation Methods
 
     /// Navigate to the chat screen (after successful authentication)
     func navigateToChat() {
+        selectedConversationId = nil
+        currentScreen = .chat
+    }
+
+    /// Navigate to chat with a specific conversation loaded (Story 3.6)
+    /// - Parameter conversationId: The conversation to load in ChatView
+    func navigateToChat(conversationId: UUID) {
+        selectedConversationId = conversationId
         currentScreen = .chat
     }
 
@@ -35,13 +48,11 @@ final class Router {
         currentScreen = .welcome
     }
 
-    /// Navigate to conversation history
-    /// Note: Will be implemented in Story 3.7
-    func navigateToHistory() {
-        // Placeholder - conversation history view will be added in Story 3.7
-        #if DEBUG
-        print("Router: navigateToHistory() called - will be implemented in Story 3.7")
-        #endif
+    /// Navigate to conversation list (Story 3.6)
+    /// Note: History is now sheet-based from ChatView (Story 3.7).
+    /// This method and .conversationList screen are kept for potential future tab-based navigation refactor.
+    func navigateToConversationList() {
+        currentScreen = .conversationList
     }
 }
 

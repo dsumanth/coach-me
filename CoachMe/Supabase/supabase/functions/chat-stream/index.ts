@@ -4,8 +4,11 @@ import { verifyAuth, AuthorizationError } from '../_shared/auth.ts';
 import { errorResponse, sseHeaders } from '../_shared/response.ts';
 import { streamChatCompletion, calculateCost, type ChatMessage } from '../_shared/llm-client.ts';
 import { logUsage } from '../_shared/cost-tracker.ts';
-import { loadUserContext } from '../_shared/context-loader.ts';
-import { buildCoachingPrompt, hasMemoryMoments } from '../_shared/prompt-builder.ts';
+import { loadUserContext, loadRelevantHistory } from '../_shared/context-loader.ts';
+import { buildCoachingPrompt, hasMemoryMoments, hasPatternInsights } from '../_shared/prompt-builder.ts';
+import { determineDomain } from '../_shared/domain-router.ts';
+import { detectCrossDomainPatterns, filterByRateLimit } from '../_shared/pattern-synthesizer.ts';
+import type { CoachingDomain } from '../_shared/prompt-builder.ts';
 
 interface ChatRequest {
   message: string;
@@ -33,9 +36,10 @@ serve(async (req: Request) => {
     }
 
     // Issue #4 FIX: Validate conversation ownership before inserting
+    // Story 3.1: Also select domain for routing continuity
     const { data: conversation, error: convError } = await supabase
       .from('conversations')
-      .select('id')
+      .select('id, domain')
       .eq('id', conversationId)
       .eq('user_id', userId)
       .single();
@@ -60,9 +64,14 @@ serve(async (req: Request) => {
       return errorResponse('Failed to save message', 500);
     }
 
-    // Story 2.4: Load user context for personalized coaching
-    // Target <200ms per architecture NFR
-    const userContext = await loadUserContext(supabase, userId);
+    // Story 2.4 + 3.3 + 3.5: Load user context, history, and cross-domain patterns in parallel
+    // Target <200ms combined per architecture NFR
+    // Story 3.5: Pattern detection runs in parallel (not on critical path)
+    const [userContext, conversationHistory, patternResult] = await Promise.all([
+      loadUserContext(supabase, userId),
+      loadRelevantHistory(supabase, userId, conversationId),
+      detectCrossDomainPatterns(userId, supabase),
+    ]);
 
     // Load conversation history for context
     const { data: historyMessages } = await supabase
@@ -72,8 +81,44 @@ serve(async (req: Request) => {
       .order('created_at', { ascending: true })
       .limit(20); // Limit history to prevent token overflow
 
-    // Story 2.4: Build context-aware system prompt
-    const systemPrompt = buildCoachingPrompt(userContext);
+    // Story 3.1: Determine coaching domain (target <100ms)
+    const currentDomain = (conversation as { id: string; domain: string | null }).domain as CoachingDomain | null;
+    const recentForRouting = (historyMessages ?? [])
+      .slice(-3)
+      .map((m: { role: string; content: string }) => ({ role: m.role, content: m.content }));
+
+    const domainResult = await determineDomain(message, {
+      currentDomain,
+      recentMessages: recentForRouting,
+    });
+
+    // Story 3.1: Update conversation domain in DB (async, non-blocking) (AC #4)
+    if (domainResult.domain !== currentDomain) {
+      supabase
+        .from('conversations')
+        .update({ domain: domainResult.domain })
+        .eq('id', conversationId)
+        .then(({ error: domainErr }: { error: unknown }) => {
+          if (domainErr) console.error('Domain update failed:', domainErr);
+        });
+    }
+
+    // Story 3.5: Apply rate limiting to cross-domain patterns (AC #4)
+    // Max 1 per session, minimum 3-session gap for same theme
+    const eligiblePatterns = await filterByRateLimit(
+      userId,
+      patternResult.patterns,
+      supabase,
+    );
+
+    // Story 3.1 + 3.3 + 3.5: Build context-aware, domain-specific system prompt
+    const systemPrompt = buildCoachingPrompt(
+      userContext,
+      domainResult.domain,
+      domainResult.shouldClarify,
+      conversationHistory.conversations,
+      eligiblePatterns,
+    );
     const messages: ChatMessage[] = [
       { role: 'system', content: systemPrompt },
       ...(historyMessages ?? []).map((m: { role: string; content: string }) => ({
@@ -86,6 +131,7 @@ serve(async (req: Request) => {
     const assistantMessageId = crypto.randomUUID();
     let fullContent = '';
     let memoryMomentFound = false;
+    let patternInsightFound = false;  // Story 3.4: Track pattern insight detection
     let tokenUsage = { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 };
     const model = 'claude-sonnet-4-20250514';
 
@@ -102,11 +148,17 @@ serve(async (req: Request) => {
               if (!memoryMomentFound) {
                 memoryMomentFound = hasMemoryMoments(fullContent);
               }
-              // Send SSE event with memory_moment flag
+              // Story 3.4: Detect pattern insights in streamed content
+              // Short-circuit: skip scanning once a pattern insight is found
+              if (!patternInsightFound) {
+                patternInsightFound = hasPatternInsights(fullContent);
+              }
+              // Send SSE event with memory_moment and pattern_insight flags
               const event = `data: ${JSON.stringify({
                 type: 'token',
                 content: chunk.content,
-                memory_moment: memoryMomentFound
+                memory_moment: memoryMomentFound,
+                pattern_insight: patternInsightFound,
               })}\n\n`;
               controller.enqueue(encoder.encode(event));
             }
@@ -149,10 +201,12 @@ serve(async (req: Request) => {
               });
 
               // Send done event (use snake_case to match iOS client decoder)
+              // Story 3.1: Include domain in metadata for future history view badges
               const doneEvent = `data: ${JSON.stringify({
                 type: 'done',
                 message_id: assistantMessageId,
-                usage: tokenUsage
+                usage: tokenUsage,
+                domain: domainResult.domain,
               })}\n\n`;
               controller.enqueue(encoder.encode(doneEvent));
             }
@@ -194,4 +248,5 @@ serve(async (req: Request) => {
 });
 
 // Note: System prompt building moved to _shared/prompt-builder.ts (Story 2.4)
-// Domain routing will be added in Story 3.1
+// Domain routing added in Story 3.1 via _shared/domain-router.ts
+// Cross-domain pattern synthesis added in Story 3.5 via _shared/pattern-synthesizer.ts

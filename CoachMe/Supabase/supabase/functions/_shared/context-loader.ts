@@ -8,8 +8,24 @@
  */
 
 import { SupabaseClient } from 'npm:@supabase/supabase-js@2.94.1';
+import { summarizeConversation } from './conversation-summarizer.ts';
 
 // MARK: - Types
+
+/** Past conversation summary for cross-session references (Story 3.3) */
+export interface PastConversation {
+  conversationId: string;
+  title: string | null;
+  domain: string | null;
+  summary: string;
+  lastMessageAt: string;
+}
+
+/** Conversation history result (Story 3.3) */
+export interface ConversationHistory {
+  conversations: PastConversation[];
+  hasHistory: boolean;
+}
 
 /** Context value from user's profile */
 export interface ContextValue {
@@ -218,4 +234,61 @@ export function formatContextForPrompt(context: UserContext): {
     situationSection,
     insightsSection,
   };
+}
+
+// MARK: - Cross-Session History Loading (Story 3.3)
+
+/**
+ * Load relevant conversation history for cross-session references
+ *
+ * @param supabase - Supabase client with user auth
+ * @param userId - User ID to load history for
+ * @param currentConversationId - Current conversation to exclude from results
+ * @returns ConversationHistory with up to 5 most recent past conversations
+ *
+ * Performance: Targets <100ms (runs in parallel with context profile load)
+ * Graceful degradation: Returns empty history on any error (AC #6)
+ */
+export async function loadRelevantHistory(
+  supabase: SupabaseClient,
+  userId: string,
+  currentConversationId: string,
+): Promise<ConversationHistory> {
+  try {
+    const { data: conversations } = await supabase
+      .from('conversations')
+      .select('id, title, domain, last_message_at')
+      .eq('user_id', userId)
+      .neq('id', currentConversationId)
+      .order('last_message_at', { ascending: false })
+      .limit(5);
+
+    if (!conversations?.length) {
+      return { conversations: [], hasHistory: false };
+    }
+
+    const summaries = await Promise.all(
+      conversations.map(async (conv: { id: string; title: string | null; domain: string | null; last_message_at: string }) => {
+        const { data: messages } = await supabase
+          .from('messages')
+          .select('role, content')
+          .eq('conversation_id', conv.id)
+          .order('created_at', { ascending: false })
+          .limit(3);
+
+        return {
+          conversationId: conv.id,
+          title: conv.title,
+          domain: conv.domain,
+          summary: summarizeConversation(messages ?? [], conv.title, conv.domain),
+          lastMessageAt: conv.last_message_at,
+        };
+      }),
+    );
+
+    return { conversations: summaries, hasHistory: true };
+  } catch (error) {
+    console.error('Failed to load history, proceeding without:', error);
+    return { conversations: [], hasHistory: false };
+  }
 }

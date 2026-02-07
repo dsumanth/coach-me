@@ -158,6 +158,7 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = C938539A2F34E29600C5A27E /* Build configuration list for PBXNativeTarget "CoachMe" */;
 			buildPhases = (
+				C932DCF02F50B00100C5A27E /* Sync Domain Configs */,
 				C938538B2F34E29200C5A27E /* Sources */,
 				C938538C2F34E29200C5A27E /* Frameworks */,
 				C938538D2F34E29200C5A27E /* Resources */,
@@ -251,6 +252,23 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		C932DCF02F50B00100C5A27E /* Sync Domain Configs */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+			);
+			name = "Sync Domain Configs";
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/bash;
+			shellScript = "\"${PROJECT_DIR}/../scripts/sync-domain-configs.sh\"\n";
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		C9174F912F35B9C200CF7AB2 /* Sources */ = {
@@ -510,6 +528,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = R67735N7V8;
 				ENABLE_PREVIEWS = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Info.plist;
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Coach App needs microphone access to hear your voice when you choose to speak your messages.";
@@ -551,6 +570,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = R67735N7V8;
 				ENABLE_PREVIEWS = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Info.plist;
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Coach App needs microphone access to hear your voice when you choose to speak your messages.";

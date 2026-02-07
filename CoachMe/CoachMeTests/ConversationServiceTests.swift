@@ -44,6 +44,17 @@ struct ConversationServiceTests {
         #expect(description.contains("sign in"))
     }
 
+    @Test("ConversationError.fetchFailed provides warm user-friendly message")
+    func testFetchFailedErrorDescription() {
+        let error = ConversationService.ConversationError.fetchFailed("Connection refused")
+
+        let description = error.errorDescription ?? ""
+        #expect(description.contains("I couldn't"))
+        #expect(description.contains("load"))
+        #expect(description.contains("conversations"))
+        #expect(description.contains("Connection refused"))
+    }
+
     @Test("ConversationError equality works for deleteFailed")
     func testDeleteFailedEquality() {
         let error1 = ConversationService.ConversationError.deleteFailed("reason")
@@ -57,12 +68,15 @@ struct ConversationServiceTests {
     @Test("ConversationError equality works across different cases")
     func testErrorCaseEquality() {
         let deleteError = ConversationService.ConversationError.deleteFailed("test")
+        let fetchError = ConversationService.ConversationError.fetchFailed("test")
         let notFoundError = ConversationService.ConversationError.notFound
         let notAuthError = ConversationService.ConversationError.notAuthenticated
 
         #expect(deleteError != notFoundError)
         #expect(notFoundError != notAuthError)
         #expect(deleteError != notAuthError)
+        #expect(fetchError != deleteError)
+        #expect(fetchError != notFoundError)
     }
 
     // MARK: - Service Singleton Tests
@@ -202,6 +216,90 @@ struct ConversationServiceMockTests {
             Issue.record("Expected error to be thrown")
         } catch let error as ConversationService.ConversationError {
             #expect(error == .notAuthenticated)
+        } catch {
+            Issue.record("Unexpected error type: \(error)")
+        }
+    }
+
+    // MARK: - Story 3.6: Fetch Tests
+
+    @Test("fetchConversations returns stubbed conversations")
+    func testFetchConversationsSuccess() async throws {
+        let mockService = MockConversationService()
+        let conv = ConversationService.Conversation(
+            id: UUID(),
+            userId: UUID(),
+            title: "Test",
+            domain: "career",
+            lastMessageAt: Date(),
+            messageCount: 3,
+            createdAt: Date(),
+            updatedAt: Date()
+        )
+        mockService.stubbedConversations = [conv]
+
+        let result = try await mockService.fetchConversations()
+
+        #expect(mockService.fetchConversationsCalled)
+        #expect(result.count == 1)
+        #expect(result[0].title == "Test")
+    }
+
+    @Test("fetchConversations throws fetchFailed on error")
+    func testFetchConversationsFailed() async {
+        let mockService = MockConversationService()
+        mockService.shouldThrowOnFetchConversations = true
+        mockService.fetchConversationsError = .fetchFailed("Timeout")
+
+        do {
+            _ = try await mockService.fetchConversations()
+            Issue.record("Expected error to be thrown")
+        } catch let error as ConversationService.ConversationError {
+            if case .fetchFailed(let reason) = error {
+                #expect(reason == "Timeout")
+            } else {
+                Issue.record("Expected fetchFailed error")
+            }
+        } catch {
+            Issue.record("Unexpected error type: \(error)")
+        }
+    }
+
+    @Test("fetchMessages returns stubbed messages for conversation")
+    func testFetchMessagesSuccess() async throws {
+        let mockService = MockConversationService()
+        let conversationId = UUID()
+        let msg = ChatMessage(
+            id: UUID(),
+            conversationId: conversationId,
+            role: .user,
+            content: "Hello",
+            createdAt: Date()
+        )
+        mockService.stubbedMessages = [msg]
+
+        let result = try await mockService.fetchMessages(conversationId: conversationId)
+
+        #expect(mockService.fetchMessagesCalled)
+        #expect(mockService.lastFetchedConversationId == conversationId)
+        #expect(result.count == 1)
+        #expect(result[0].content == "Hello")
+    }
+
+    @Test("fetchMessages throws fetchFailed on error")
+    func testFetchMessagesFailed() async {
+        let mockService = MockConversationService()
+        mockService.shouldThrowOnFetchMessages = true
+
+        do {
+            _ = try await mockService.fetchMessages(conversationId: UUID())
+            Issue.record("Expected error to be thrown")
+        } catch let error as ConversationService.ConversationError {
+            if case .fetchFailed = error {
+                // Expected
+            } else {
+                Issue.record("Expected fetchFailed error")
+            }
         } catch {
             Issue.record("Unexpected error type: \(error)")
         }

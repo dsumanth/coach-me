@@ -18,6 +18,8 @@ protocol ConversationServiceProtocol: Sendable {
     func updateConversation(id: UUID, title: String?) async
     func deleteConversation(id: UUID) async throws
     func deleteAllConversations() async throws
+    func fetchConversations() async throws -> [ConversationService.Conversation]
+    func fetchMessages(conversationId: UUID) async throws -> [ChatMessage]
 }
 
 /// Service for managing conversation lifecycle in the database
@@ -36,6 +38,7 @@ final class ConversationService: ConversationServiceProtocol {
         case creationFailed(String)
         case notFound
         case deleteFailed(String)
+        case fetchFailed(String)
 
         var errorDescription: String? {
             switch self {
@@ -47,12 +50,14 @@ final class ConversationService: ConversationServiceProtocol {
                 return "Couldn't find that conversation."
             case .deleteFailed(let reason):
                 return "I couldn't remove that conversation. \(reason)"
+            case .fetchFailed(let reason):
+                return "I couldn't load your conversations right now. \(reason)"
             }
         }
     }
 
     /// Conversation model matching database schema
-    struct Conversation: Codable, Identifiable, Sendable {
+    struct Conversation: Codable, Identifiable, Sendable, Hashable {
         let id: UUID
         let userId: UUID
         var title: String?
@@ -273,6 +278,68 @@ final class ConversationService: ConversationServiceProtocol {
             print("ConversationService: Failed to delete all conversations: \(error)")
             #endif
             throw ConversationError.deleteFailed(error.localizedDescription)
+        }
+    }
+
+    // MARK: - Fetch Methods (Story 3.6)
+
+    /// Fetches all conversations for the current user, ordered by most recent first
+    /// - Returns: Array of conversations sorted by last_message_at DESC
+    /// - Throws: ConversationError if user is not authenticated or fetch fails
+    func fetchConversations() async throws -> [Conversation] {
+        guard (try? await getCurrentUserId()) != nil else {
+            throw ConversationError.notAuthenticated
+        }
+
+        do {
+            let conversations: [Conversation] = try await supabase
+                .from("conversations")
+                .select()
+                .order("last_message_at", ascending: false)
+                .execute()
+                .value
+
+            #if DEBUG
+            print("ConversationService: Fetched \(conversations.count) conversations")
+            #endif
+
+            return conversations
+        } catch {
+            #if DEBUG
+            print("ConversationService: Failed to fetch conversations: \(error)")
+            #endif
+            throw ConversationError.fetchFailed(error.localizedDescription)
+        }
+    }
+
+    /// Fetches all messages for a given conversation, ordered by creation time
+    /// - Parameter conversationId: The conversation to fetch messages for
+    /// - Returns: Array of messages sorted by created_at ASC
+    /// - Throws: ConversationError if user is not authenticated or fetch fails
+    func fetchMessages(conversationId: UUID) async throws -> [ChatMessage] {
+        guard (try? await getCurrentUserId()) != nil else {
+            throw ConversationError.notAuthenticated
+        }
+
+        do {
+            let messages: [ChatMessage] = try await supabase
+                .from("messages")
+                .select()
+                .eq("conversation_id", value: conversationId.uuidString)
+                .order("created_at")
+                .execute()
+                .value
+
+            #if DEBUG
+            print("ConversationService: Fetched \(messages.count) messages for conversation \(conversationId)")
+            #endif
+
+            return messages
+        } catch {
+            #if DEBUG
+            print("ConversationService: Failed to fetch messages: \(error)")
+            #endif
+            throw ConversationError.fetchFailed(error.localizedDescription)
         }
     }
 

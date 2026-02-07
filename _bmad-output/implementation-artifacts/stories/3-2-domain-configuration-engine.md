@@ -1,6 +1,6 @@
 # Story 3.2: Domain Configuration Engine
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -30,48 +30,48 @@ So that **I can tune domain behavior (tone, methodology, system prompt, personal
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Enhance domain JSON configs with full schema (AC: #1)
-  - [ ] 1.1 Extend each of the 7 domain JSON files (created by Story 3-1) with: `systemPromptAddition`, `personality`, `focusAreas`, `enabled` fields
-  - [ ] 1.2 Create `Resources/DomainConfigs/general.json` as explicit fallback config
-  - [ ] 1.3 Validate all 8 JSON files parse correctly
-- [ ] Task 2: Enhance DomainConfig Swift model (AC: #1, #4)
-  - [ ] 2.1 Extend `DomainConfig.swift` (created by 3-1 in `Core/Constants/`) with full schema fields
-  - [ ] 2.2 Add `CoachingDomain` enum if not already created, with `rawValue` matching JSON `id` fields
-  - [ ] 2.3 Add factory method `DomainConfig.general()` for fallback
-- [ ] Task 3: Create DomainConfigService (AC: #4, #6)
-  - [ ] 3.1 Create `DomainConfigServiceProtocol` for testability
-  - [ ] 3.2 Create `Core/Services/DomainConfigService.swift` — loads JSON from Bundle, caches in-memory dictionary
-  - [ ] 3.3 Implement `config(for domain: CoachingDomain) -> DomainConfig` with `general` fallback
-  - [ ] 3.4 Handle malformed/missing JSON: log warning, skip, use general fallback
-- [ ] Task 4: Create `_shared/domain-configs.ts` Edge Function config loader (AC: #2, #5, #7)
-  - [ ] 4.1 Create `_shared/domain-configs/` directory and copy all JSON config files (same files as iOS Bundle) as the single source of truth for Edge Functions
-  - [ ] 4.2 Create `domain-configs.ts` with `DomainConfig` TypeScript interface mirroring the JSON schema
-  - [ ] 4.3 Implement `loadDomainConfigs()` — reads all JSON files from `_shared/domain-configs/` using `Deno.readTextFile()`, parses, validates, and caches in a module-level `Map<string, DomainConfig>`
-  - [ ] 4.4 Export `getDomainConfig(domain: string): DomainConfig` function with `general` fallback (reads from cached map)
-  - [ ] 4.5 Export `getDomainKeywords(domain: string): string[]` for domain-router.ts consumption
-  - [ ] 4.6 Call `loadDomainConfigs()` once at module import (top-level await) so configs are cached for all subsequent requests
-- [ ] Task 5: Refactor prompt-builder.ts to be config-driven (AC: #2, #5)
-  - [ ] 5.1 Import `getDomainConfig` from `domain-configs.ts`
-  - [ ] 5.2 In `buildCoachingPrompt()`, load domain config and append `systemPromptAddition` to base prompt
-  - [ ] 5.3 Add tone/methodology/personality instructions from config to prompt
-  - [ ] 5.4 Remove any hardcoded domain-specific prompt text that Story 3-1 may have added inline — move to config objects
-  - [ ] 5.5 Ensure `general` domain uses base prompt only (no additions)
-- [ ] Task 6: Update domain-router.ts to use config keywords (AC: #7)
-  - [ ] 6.1 Import `getDomainKeywords` from `domain-configs.ts`
-  - [ ] 6.2 Replace any hardcoded keyword arrays with config-driven keyword loading
-  - [ ] 6.3 Verify dynamically-added domains work end-to-end: new JSON file in `_shared/domain-configs/` (canonical source) → build phase auto-syncs to `Resources/DomainConfigs/` → auto-discovered by both platforms → keywords available to router → routing works on iOS and Edge → no code changes needed
-- [ ] Task 7: Config synchronization between iOS and Edge Functions (AC: #3)
-  - [ ] 7.1 Designate `_shared/domain-configs/` as the canonical source directory; `Resources/DomainConfigs/` contains copies for iOS Bundle inclusion
-  - [ ] 7.2 Create `scripts/sync-domain-configs.sh` — copies all JSON files from `_shared/domain-configs/` to `Resources/DomainConfigs/`, logs diff if files diverge
-  - [ ] 7.3 Add an Xcode "Run Script" build phase (or pre-build script) that runs `sync-domain-configs.sh` to auto-copy configs into the iOS Bundle at build time
-  - [ ] 7.4 Create `scripts/validate-domain-configs.sh` — byte-for-byte comparison of both directories, exits non-zero on mismatch (CI/CD ready)
-  - [ ] 7.5 Document the sync process in Dev Notes: operators add/edit JSON in `_shared/domain-configs/` only, build phase propagates to iOS
-- [ ] Task 8: Write unit tests (AC: all)
-  - [ ] 8.1 Test `DomainConfigService` loads all configs from Bundle
-  - [ ] 8.2 Test fallback to `general` on unknown/missing domain
-  - [ ] 8.3 Test `DomainConfig` model decoding from JSON
-  - [ ] 8.4 Test `getDomainConfig()` in Edge Function returns correct config per domain
-  - [ ] 8.5 Test `buildCoachingPrompt()` with specific domain includes config-driven prompt additions
+- [x] Task 1: Enhance domain JSON configs with full schema (AC: #1)
+  - [x] 1.1 Extend each of the 7 domain JSON files (created by Story 3-1) with: `systemPromptAddition`, `personality`, `focusAreas`, `enabled` fields
+  - [x] 1.2 Create `Resources/DomainConfigs/general.json` as explicit fallback config
+  - [x] 1.3 Validate all 8 JSON files parse correctly
+- [x] Task 2: Enhance DomainConfig Swift model (AC: #1, #4)
+  - [x] 2.1 Extend `DomainConfig.swift` (created by 3-1 in `Core/Constants/`) with full schema fields
+  - [x] 2.2 Add `CoachingDomain` enum if not already created, with `rawValue` matching JSON `id` fields
+  - [x] 2.3 Add factory method `DomainConfig.general()` for fallback
+- [x] Task 3: Create DomainConfigService (AC: #4, #6)
+  - [x] 3.1 Create `DomainConfigServiceProtocol` for testability
+  - [x] 3.2 Create `Core/Services/DomainConfigService.swift` — loads JSON from Bundle, caches in-memory dictionary
+  - [x] 3.3 Implement `config(for domain: CoachingDomain) -> DomainConfig` with `general` fallback
+  - [x] 3.4 Handle malformed/missing JSON: log warning, skip, use general fallback
+- [x] Task 4: Create `_shared/domain-configs.ts` Edge Function config loader (AC: #2, #5, #7)
+  - [x] 4.1 Create `_shared/domain-configs/` directory and copy all JSON config files (same files as iOS Bundle) as the single source of truth for Edge Functions
+  - [x] 4.2 Create `domain-configs.ts` with `DomainConfig` TypeScript interface mirroring the JSON schema
+  - [x] 4.3 Implement `loadDomainConfigs()` — reads all JSON files from `_shared/domain-configs/` using `Deno.readTextFile()`, parses, validates, and caches in a module-level `Map<string, DomainConfig>`
+  - [x] 4.4 Export `getDomainConfig(domain: string): DomainConfig` function with `general` fallback (reads from cached map)
+  - [x] 4.5 Export `getDomainKeywords(domain: string): string[]` for domain-router.ts consumption
+  - [x] 4.6 Call `loadDomainConfigs()` once at module import (top-level await) so configs are cached for all subsequent requests
+- [x] Task 5: Refactor prompt-builder.ts to be config-driven (AC: #2, #5)
+  - [x] 5.1 Import `getDomainConfig` from `domain-configs.ts`
+  - [x] 5.2 In `buildCoachingPrompt()`, load domain config and append `systemPromptAddition` to base prompt
+  - [x] 5.3 Add tone/methodology/personality instructions from config to prompt
+  - [x] 5.4 Remove any hardcoded domain-specific prompt text that Story 3-1 may have added inline — move to config objects
+  - [x] 5.5 Ensure `general` domain uses base prompt only (no additions)
+- [x] Task 6: Update domain-router.ts to use config keywords (AC: #7)
+  - [x] 6.1 Import `getDomainKeywords` from `domain-configs.ts`
+  - [x] 6.2 Replace any hardcoded keyword arrays with config-driven keyword loading
+  - [x] 6.3 Verify dynamically-added domains work end-to-end: new JSON file in `_shared/domain-configs/` (canonical source) → build phase auto-syncs to `Resources/DomainConfigs/` → auto-discovered by both platforms → keywords available to router → routing works on iOS and Edge → no code changes needed
+- [x] Task 7: Config synchronization between iOS and Edge Functions (AC: #3)
+  - [x] 7.1 Designate `_shared/domain-configs/` as the canonical source directory; `Resources/DomainConfigs/` contains copies for iOS Bundle inclusion
+  - [x] 7.2 Create `scripts/sync-domain-configs.sh` — copies all JSON files from `_shared/domain-configs/` to `Resources/DomainConfigs/`, logs diff if files diverge
+  - [x] 7.3 Add an Xcode "Run Script" build phase (or pre-build script) that runs `sync-domain-configs.sh` to auto-copy configs into the iOS Bundle at build time
+  - [x] 7.4 Create `scripts/validate-domain-configs.sh` — byte-for-byte comparison of both directories, exits non-zero on mismatch (CI/CD ready)
+  - [x] 7.5 Document the sync process in Dev Notes: operators add/edit JSON in `_shared/domain-configs/` only, build phase propagates to iOS
+- [x] Task 8: Write unit tests (AC: all)
+  - [x] 8.1 Test `DomainConfigService` loads all configs from Bundle
+  - [x] 8.2 Test fallback to `general` on unknown/missing domain
+  - [x] 8.3 Test `DomainConfig` model decoding from JSON
+  - [x] 8.4 Test `getDomainConfig()` in Edge Function returns correct config per domain
+  - [x] 8.5 Test `buildCoachingPrompt()` with specific domain includes config-driven prompt additions
 
 ## Dev Notes
 
@@ -342,9 +342,59 @@ Story 3-1 work will be committed between this story's creation and implementatio
 ## Dev Agent Record
 
 ### Agent Model Used
+Claude Opus 4.6 via Claude Code
 
 ### Debug Log References
+- Build succeeded after all changes (Xcode 26.2, Swift 6.0, iOS 18.0)
+- SourceKit cross-file diagnostics for CoachingDomain/DomainConfig resolve at build time
+- Build warning about Run Script phase not specifying outputs (non-blocking, sync script runs every build intentionally)
 
 ### Completion Notes List
+- Removed CodingKeys from DomainConfig.swift — config JSON uses camelCase (not snake_case DB models)
+- Renamed Story 3-1's `life-coaching.json`/`career-coaching.json` to `life.json`/`career.json` to match `id` field values
+- Removed hardcoded `DOMAIN_PROMPTS` record from prompt-builder.ts, replaced with `getDomainConfig()` calls
+- Removed hardcoded `DOMAIN_KEYWORDS` record from domain-router.ts, replaced with `getDomainKeywords()`/`getAllDomainConfigs()`
+- Added `ENABLE_USER_SCRIPT_SANDBOXING = NO` to CoachMe target for sync script to write to source tree
+- General domain: empty `systemPromptAddition` (no specialization text appended), but tone/methodology/personality are populated for consistent coaching tone in fallback
+- domain-configs.ts uses top-level `await loadDomainConfigs()` for one-time init at module import
+- Updated domain-router.test.ts and prompt-builder.test.ts to use config-driven assertions (Story 3.2)
+
+### Change Log
+- Created 8 JSON config files in `_shared/domain-configs/` (canonical source) with full schema
+- Copied 8 JSON config files to `Resources/DomainConfigs/` (iOS Bundle)
+- Rewrote `DomainConfig.swift` with full schema, removed CodingKeys, added `general()` factory
+- Created `DomainConfigService.swift` with protocol, @MainActor singleton, Bundle loading, caching
+- Created `domain-configs.ts` with TypeScript interface, file loader, module-level Map cache, public API
+- Refactored `prompt-builder.ts` to build prompts from config fields instead of hardcoded DOMAIN_PROMPTS
+- Refactored `domain-router.ts` to use config-driven keywords instead of hardcoded DOMAIN_KEYWORDS
+- Created `scripts/sync-domain-configs.sh` and `scripts/validate-domain-configs.sh`
+- Added Xcode Run Script build phase for automatic config sync
+- Created `DomainConfigServiceTests.swift` (Swift Testing framework)
+- Updated `domain-router.test.ts` with config-driven keyword tests
+- Updated `prompt-builder.test.ts` with config-driven prompt assertions
 
 ### File List
+
+**Created:**
+- `CoachMe/Supabase/supabase/functions/_shared/domain-configs/life.json`
+- `CoachMe/Supabase/supabase/functions/_shared/domain-configs/career.json`
+- `CoachMe/Supabase/supabase/functions/_shared/domain-configs/relationships.json`
+- `CoachMe/Supabase/supabase/functions/_shared/domain-configs/mindset.json`
+- `CoachMe/Supabase/supabase/functions/_shared/domain-configs/creativity.json`
+- `CoachMe/Supabase/supabase/functions/_shared/domain-configs/fitness.json`
+- `CoachMe/Supabase/supabase/functions/_shared/domain-configs/leadership.json`
+- `CoachMe/Supabase/supabase/functions/_shared/domain-configs/general.json`
+- `CoachMe/Supabase/supabase/functions/_shared/domain-configs.ts`
+- `CoachMe/CoachMe/Core/Services/DomainConfigService.swift`
+- `CoachMe/CoachMeTests/DomainConfigServiceTests.swift`
+- `scripts/sync-domain-configs.sh`
+- `scripts/validate-domain-configs.sh`
+
+**Modified:**
+- `CoachMe/CoachMe/Core/Constants/DomainConfig.swift` — full schema, removed CodingKeys
+- `CoachMe/CoachMe/Resources/DomainConfigs/*.json` — synced copies from canonical source
+- `CoachMe/Supabase/supabase/functions/_shared/prompt-builder.ts` — config-driven prompts
+- `CoachMe/Supabase/supabase/functions/_shared/domain-router.ts` — config-driven keywords
+- `CoachMe/Supabase/supabase/functions/_shared/prompt-builder.test.ts` — updated assertions
+- `CoachMe/Supabase/supabase/functions/_shared/domain-router.test.ts` — updated assertions
+- `CoachMe/CoachMe.xcodeproj/project.pbxproj` — Run Script build phase, disabled script sandboxing

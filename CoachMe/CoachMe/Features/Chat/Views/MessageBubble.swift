@@ -5,6 +5,7 @@
 //  Created by Sumanth Daggubati on 2/6/26.
 //
 //  Story 2.4: Updated to render memory moments with visual treatment (UX-4)
+//  Story 3.4: Updated to render pattern insights with distinct treatment (UX-5)
 //
 
 import SwiftUI
@@ -13,6 +14,7 @@ import UIKit
 /// Chat bubble for user and assistant messages
 /// Per architecture.md: NO glass on content — same styling on both iOS tiers
 /// Story 2.4: Assistant messages parse and highlight memory moments
+/// Story 3.4: Also renders pattern insights with distinct UX-5 treatment
 struct MessageBubble: View {
     let message: ChatMessage
     var isFailedToSend: Bool = false
@@ -21,8 +23,8 @@ struct MessageBubble: View {
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
-        // Parse once per body evaluation to avoid redundant work
-        let parsed: MemoryParseResult? = message.isFromUser ? nil : MemoryMomentParser.parse(message.content)
+        // Story 3.4: Parse all tags (memory + pattern) once per body evaluation
+        let parsed: TagParseResult? = message.isFromUser ? nil : MemoryMomentParser.parseAll(message.content)
 
         HStack {
             if message.isFromUser {
@@ -44,7 +46,8 @@ struct MessageBubble: View {
             }
         }
         .padding(.horizontal, 16)
-        .padding(.vertical, 4)
+        // Story 3.4: Extra vertical padding when pattern insights present (UX-5 32px spacing)
+        .padding(.vertical, (parsed?.hasPatternInsights == true) ? 16 : 4)
         .contextMenu {
             Button {
                 let textToCopy = parsed?.cleanText ?? message.content
@@ -60,9 +63,9 @@ struct MessageBubble: View {
 
     // MARK: - Bubble Content
 
-    /// Story 2.4: Renders content with memory moment highlighting for assistant messages
+    /// Story 2.4 + 3.4: Renders content with memory moment and pattern insight highlighting
     @ViewBuilder
-    private func bubbleContent(parsed: MemoryParseResult?) -> some View {
+    private func bubbleContent(parsed: TagParseResult?) -> some View {
         if message.isFromUser {
             // User messages: plain text
             Text(message.content)
@@ -70,19 +73,22 @@ struct MessageBubble: View {
                 .foregroundColor(textColor)
                 .textSelection(.enabled)
         } else {
-            // Assistant messages: render with memory moments
-            let result = parsed ?? MemoryParseResult(cleanText: message.content, moments: [])
+            // Assistant messages: render with coaching tags
+            let result = parsed ?? TagParseResult(cleanText: message.content, tags: [])
             VStack(alignment: .leading, spacing: 8) {
                 Text(result.cleanText)
                     .font(.body)
                     .foregroundColor(textColor)
                     .textSelection(.enabled)
 
-                // Story 2.4: Show memory moments with visual treatment
-                if result.hasMemoryMoments {
-                    FlowLayout(spacing: 6) {
-                        ForEach(result.moments) { moment in
-                            MemoryMomentText(content: moment.content)
+                // Story 2.4 + 3.4: Show coaching tags with type-specific visual treatment
+                if !result.tags.isEmpty {
+                    ForEach(result.tags) { tag in
+                        switch tag.type {
+                        case .memory:
+                            MemoryMomentText(content: tag.content)
+                        case .pattern:
+                            PatternInsightText(content: tag.content)
                         }
                     }
                 }
@@ -92,13 +98,20 @@ struct MessageBubble: View {
 
     // MARK: - Accessibility
 
-    /// Accessibility label including memory moment context
-    private func accessibilityText(parsed: MemoryParseResult?) -> String {
+    /// Accessibility label including memory moment and pattern insight context
+    private func accessibilityText(parsed: TagParseResult?) -> String {
         let sender = message.isFromUser ? "You" : "Coach"
 
-        if let result = parsed, result.hasMemoryMoments {
-            let momentContents = result.moments.map { "I remembered: \($0.content)" }.joined(separator: ". ")
-            return "\(sender): \(result.cleanText). \(momentContents)"
+        if let result = parsed, !result.tags.isEmpty {
+            let tagDescriptions = result.tags.map { tag in
+                switch tag.type {
+                case .memory:
+                    return "I remembered: \(tag.content)"
+                case .pattern:
+                    return "Coach insight based on your conversation patterns: \(tag.content)"
+                }
+            }.joined(separator: ". ")
+            return "\(sender): \(result.cleanText). \(tagDescriptions)"
         } else {
             return "\(sender): \(message.content)"
         }
@@ -225,6 +238,24 @@ struct MessageBubbleShape: Shape {
 
             MessageBubble(message: ChatMessage.assistantMessage(
                 content: "Given that you value [MEMORY: honesty and authenticity], how does this situation align with that? I remember you mentioned [MEMORY: navigating a career transition] - this sounds like it might be connected.",
+                conversationId: UUID()
+            ))
+        }
+    }
+}
+
+#Preview("With Pattern Insight") {
+    ZStack {
+        Color.cream.ignoresSafeArea()
+
+        VStack(spacing: 16) {
+            MessageBubble(message: ChatMessage.userMessage(
+                content: "I feel stuck again with this project.",
+                conversationId: UUID()
+            ))
+
+            MessageBubble(message: ChatMessage.assistantMessage(
+                content: "I've noticed [PATTERN: you often describe feeling stuck right before a big transition]. What do you think that pattern means for you?",
                 conversationId: UUID()
             ))
         }

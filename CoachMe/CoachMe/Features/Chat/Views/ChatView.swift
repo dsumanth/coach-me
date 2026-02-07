@@ -25,17 +25,17 @@ struct ChatView: View {
     /// Insight suggestions view model - manages progressive context extraction (Story 2.3)
     @State private var insightSuggestionsViewModel = InsightSuggestionsViewModel()
 
-    // Router available via environment for future navigation (Story 3.7)
-    // @Environment(\.router) private var router: Router
-
-    /// Whether to show the "coming soon" toast for history
-    @State private var showHistoryToast = false
+    /// Router for navigation (Story 3.6)
+    @Environment(\.router) private var router
 
     /// Whether to show the context profile sheet (Story 2.5)
     @State private var showContextProfile = false
 
     /// Whether to show the settings view (Story 2.6)
     @State private var showSettings = false
+
+    /// Whether to show the conversation history sheet (Story 3.7)
+    @State private var showHistory = false
     @Environment(\.colorScheme) private var colorScheme
 
     // MARK: - Initialization
@@ -68,12 +68,6 @@ struct ChatView: View {
                 } else {
                     messageList
                 }
-            }
-
-            // History coming soon toast
-            if showHistoryToast {
-                historyToast
-                    .transition(.move(edge: .top).combined(with: .opacity))
             }
 
             if contextPromptViewModel.showPrompt {
@@ -207,6 +201,15 @@ struct ChatView: View {
                 SettingsView()
             }
         }
+        // Conversation history sheet (Story 3.7)
+        .sheet(isPresented: $showHistory) {
+            HistoryView(onContinueConversation: { conversationId in
+                Task {
+                    await viewModel.loadConversation(id: conversationId)
+                }
+            })
+            .presentationDragIndicator(.visible)
+        }
         // Delete conversation confirmation alert (Story 2.6 - Task 4.2)
         .singleConversationDeleteAlert(isPresented: $viewModel.showDeleteConfirmation) {
             Task {
@@ -258,6 +261,12 @@ struct ChatView: View {
         .task {
             // Set auth token for streaming API calls
             await configureAuthToken()
+
+            // Load selected conversation from router (Story 3.6)
+            if let conversationId = router.selectedConversationId {
+                router.selectedConversationId = nil
+                await viewModel.loadConversation(id: conversationId)
+            }
         }
     }
 
@@ -379,7 +388,7 @@ struct ChatView: View {
                     }
 
                     Button {
-                        showHistoryComingSoon()
+                        navigateToHistory()
                     } label: {
                         Label("Conversation history", systemImage: "clock.arrow.circlepath")
                     }
@@ -594,45 +603,11 @@ struct ChatView: View {
         .accessibilityLabel("Personalization suggestion")
     }
 
-    // MARK: - Toast
-
-    /// Toast shown when history button is tapped
-    private var historyToast: some View {
-        VStack {
-            Text("Conversation history coming soon!")
-                .font(.subheadline.weight(.medium))
-                .foregroundColor(Color.adaptiveText(colorScheme))
-                .padding(.horizontal, 20)
-                .padding(.vertical, 12)
-                .background(
-                    colorScheme == .dark
-                        ? Color.warmGray700.opacity(0.8)
-                        : Color.warmGray100
-                )
-                .clipShape(Capsule())
-                .shadow(color: .black.opacity(0.1), radius: 8, y: 4)
-                .padding(.top, 60)
-
-            Spacer()
-        }
-        .accessibilityLabel("Conversation history coming soon")
-    }
-
     // MARK: - Actions
 
-    /// Shows a toast that history is coming soon
-    private func showHistoryComingSoon() {
-        withAnimation(.spring(duration: 0.3)) {
-            showHistoryToast = true
-        }
-
-        // Auto-dismiss after 2 seconds
-        Task {
-            try? await Task.sleep(nanoseconds: 2_000_000_000)
-            withAnimation(.spring(duration: 0.3)) {
-                showHistoryToast = false
-            }
-        }
+    /// Shows conversation history sheet (Story 3.7 — sheet-based, not router-based)
+    private func navigateToHistory() {
+        showHistory = true
     }
 
     /// Starts a new conversation
@@ -659,7 +634,8 @@ struct ChatView: View {
         !contextPromptViewModel.showSetupForm &&
         !insightSuggestionsViewModel.showSuggestions &&
         !showContextProfile &&
-        !showSettings
+        !showSettings &&
+        !showHistory
     }
 
     /// Dismisses keyboard from anywhere in the view hierarchy.

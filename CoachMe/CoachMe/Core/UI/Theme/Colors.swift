@@ -61,6 +61,31 @@ extension Color {
     /// #D4A574 (212, 165, 116) - softer, more muted gold that reads as "memory" not "warning"
     static let memoryIndicatorDark = Color(red: 212/255, green: 165/255, blue: 116/255)
 
+    /// Pattern insight background - subtle sage tint for light mode (UX-5)
+    /// Warm, reflective tone — distinct from memory peach
+    static let patternSage = Color(red: 230/255, green: 240/255, blue: 230/255)
+
+    /// Pattern insight background for dark mode - warm dark surface variant (UX-5)
+    static let patternSageDark = Color(red: 38/255, green: 45/255, blue: 38/255)
+
+    /// Pattern insight indicator - sage green (light mode)
+    static let patternIndicator = Color(red: 93/255, green: 143/255, blue: 93/255)
+
+    /// Pattern insight indicator for dark mode - softer sage green
+    static let patternIndicatorDark = Color(red: 140/255, green: 190/255, blue: 140/255)
+
+    /// Pattern insight left border - accent-primary sage (UX-5)
+    static let patternBorder = Color(red: 93/255, green: 143/255, blue: 93/255)
+
+    // MARK: - Story 3.5: Cross-Domain Pattern Insight Aliases
+    // Aliases per Story 3.5 spec naming; same sage palette as patternSage
+
+    /// Cross-domain insight primary color — soft sage green (Task 9.1)
+    static let insightSage = patternIndicator
+
+    /// Cross-domain insight subtle background tint (Task 9.2)
+    static let insightSageSubtle = patternSage
+
     // MARK: - Domain Colors (Light Mode)
 
     /// Life coaching - warm teal (growth, vitality)

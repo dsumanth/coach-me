@@ -1,0 +1,12 @@
+{
+  "id": "general",
+  "name": "General Coaching",
+  "description": "Broad personal coaching covering any topic",
+  "systemPromptAddition": "",
+  "tone": "warm, supportive, curious",
+  "methodology": "active listening, open-ended questions, reflective coaching",
+  "personality": "empathetic coach who adapts to whatever the user needs",
+  "domainKeywords": [],
+  "focusAreas": [],
+  "enabled": true
+}

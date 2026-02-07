@@ -3,6 +3,7 @@
 //  CoachMeTests
 //
 //  Story 2.4: Context Injection into Coaching Responses
+//  Story 3.4: Pattern Recognition Across Conversations
 //  Tests for MemoryMomentParser service
 //
 
@@ -213,5 +214,216 @@ struct MemoryMomentParserTests {
 
         #expect(result.moments.count == 1)
         #expect(result.moments[0].content == "work-life balance & self-care")
+    }
+
+    // MARK: - Story 3.4: Regression Tests (existing parse() unchanged)
+
+    @Test("Existing parse() still works unchanged after Story 3.4")
+    func testExistingParseStillWorks() {
+        let text = "Given [MEMORY: honesty], how does this align?"
+        let result = MemoryMomentParser.parse(text)
+
+        #expect(result.hasMemoryMoments == true)
+        #expect(result.moments.count == 1)
+        #expect(result.moments[0].content == "honesty")
+        #expect(result.cleanText == "Given honesty, how does this align?")
+    }
+
+    @Test("Existing parse() ignores [PATTERN:] tags")
+    func testExistingParseIgnoresPatternTags() {
+        let text = "I noticed [PATTERN: stuck before transitions] and [MEMORY: honesty]."
+        let result = MemoryMomentParser.parse(text)
+
+        // parse() only finds [MEMORY:] tags — [PATTERN:] is left in clean text
+        #expect(result.moments.count == 1)
+        #expect(result.moments[0].content == "honesty")
+        #expect(result.cleanText.contains("[PATTERN:"))
+    }
+
+    // MARK: - Story 3.4: parseAll() Tests
+
+    @Test("parseAll() detects [PATTERN:] tags")
+    func testParseAllDetectsPatternTags() {
+        let text = "I've noticed [PATTERN: you feel stuck before transitions]. What does that mean?"
+        let result = MemoryMomentParser.parseAll(text)
+
+        #expect(result.hasPatternInsights == true)
+        #expect(result.hasMemoryMoments == false)
+        #expect(result.tags.count == 1)
+        #expect(result.tags[0].type == .pattern)
+        #expect(result.tags[0].content == "you feel stuck before transitions")
+        #expect(result.cleanText == "I've noticed you feel stuck before transitions. What does that mean?")
+    }
+
+    @Test("parseAll() detects [MEMORY:] tags")
+    func testParseAllDetectsMemoryTags() {
+        let text = "Given your value of [MEMORY: honesty], what would you do?"
+        let result = MemoryMomentParser.parseAll(text)
+
+        #expect(result.hasMemoryMoments == true)
+        #expect(result.hasPatternInsights == false)
+        #expect(result.tags.count == 1)
+        #expect(result.tags[0].type == .memory)
+        #expect(result.tags[0].content == "honesty")
+    }
+
+    @Test("parseAll() detects both [MEMORY:] and [PATTERN:] tags in same text")
+    func testParseAllDetectsBothTagTypes() {
+        let text = "Given [MEMORY: your goal of growth], I've noticed [PATTERN: you feel stuck before transitions]."
+        let result = MemoryMomentParser.parseAll(text)
+
+        #expect(result.hasMemoryMoments == true)
+        #expect(result.hasPatternInsights == true)
+        #expect(result.tags.count == 2)
+    }
+
+    @Test("parseAll() preserves tag order by position in text")
+    func testParseAllPreservesTagOrder() {
+        let text = "I see [PATTERN: a recurring theme]. Given [MEMORY: your honesty], this makes sense."
+        let result = MemoryMomentParser.parseAll(text)
+
+        #expect(result.tags.count == 2)
+        #expect(result.tags[0].type == .pattern)
+        #expect(result.tags[0].content == "a recurring theme")
+        #expect(result.tags[1].type == .memory)
+        #expect(result.tags[1].content == "your honesty")
+    }
+
+    @Test("parseAll() returns correct hasMemoryMoments and hasPatternInsights flags")
+    func testParseAllReturnsCorrectFlags() {
+        // Only pattern
+        let patternOnly = MemoryMomentParser.parseAll("I noticed [PATTERN: fear of change].")
+        #expect(patternOnly.hasPatternInsights == true)
+        #expect(patternOnly.hasMemoryMoments == false)
+
+        // Only memory
+        let memoryOnly = MemoryMomentParser.parseAll("Your [MEMORY: goal].")
+        #expect(memoryOnly.hasPatternInsights == false)
+        #expect(memoryOnly.hasMemoryMoments == true)
+
+        // Both
+        let both = MemoryMomentParser.parseAll("[MEMORY: goal] and [PATTERN: pattern].")
+        #expect(both.hasPatternInsights == true)
+        #expect(both.hasMemoryMoments == true)
+
+        // Neither
+        let neither = MemoryMomentParser.parseAll("Regular text.")
+        #expect(neither.hasPatternInsights == false)
+        #expect(neither.hasMemoryMoments == false)
+    }
+
+    @Test("parseAll() with no tags returns empty tags and clean text")
+    func testParseAllWithNoTags() {
+        let text = "This is a regular coaching response."
+        let result = MemoryMomentParser.parseAll(text)
+
+        #expect(result.tags.isEmpty)
+        #expect(result.hasMemoryMoments == false)
+        #expect(result.hasPatternInsights == false)
+        #expect(result.cleanText == text)
+    }
+
+    @Test("parseAll() handles empty string")
+    func testParseAllEmptyString() {
+        let result = MemoryMomentParser.parseAll("")
+
+        #expect(result.tags.isEmpty)
+        #expect(result.cleanText == "")
+    }
+
+    @Test("parseAll() strips both tag types from clean text")
+    func testParseAllStripsBothTagTypes() {
+        let text = "I see [PATTERN: a theme] and remember [MEMORY: your goal]."
+        let result = MemoryMomentParser.parseAll(text)
+
+        #expect(result.cleanText == "I see a theme and remember your goal.")
+    }
+
+    @Test("parseAll() caches results (memoization)")
+    func testParseAllCachesMemoizedResults() {
+        let text = "I see [PATTERN: a recurring theme]."
+
+        // Parse twice — second call should use cache
+        let result1 = MemoryMomentParser.parseAll(text)
+        let result2 = MemoryMomentParser.parseAll(text)
+
+        #expect(result1.cleanText == result2.cleanText)
+        #expect(result1.tags.count == result2.tags.count)
+    }
+
+    // MARK: - Story 3.4: CoachingTag Tests
+
+    @Test("CoachingTag is equatable")
+    func testCoachingTagEquatable() {
+        let id = UUID()
+        let tag1 = CoachingTag(id: id, type: .pattern, content: "theme")
+        let tag2 = CoachingTag(id: id, type: .pattern, content: "theme")
+        let tag3 = CoachingTag(type: .memory, content: "goal")
+
+        #expect(tag1 == tag2)
+        #expect(tag1 != tag3)
+    }
+
+    @Test("CoachingTagType distinguishes memory and pattern")
+    func testCoachingTagTypeDistinction() {
+        let memoryTag = CoachingTag(type: .memory, content: "goal")
+        let patternTag = CoachingTag(type: .pattern, content: "theme")
+
+        #expect(memoryTag.type == .memory)
+        #expect(patternTag.type == .pattern)
+        #expect(memoryTag.type != patternTag.type)
+    }
+
+    // MARK: - Story 3.4: Pattern Utility Tests
+
+    @Test("hasPatternInsights returns true for pattern tags")
+    func testHasPatternInsightsTrue() {
+        let text = "I see [PATTERN: stuck before transitions]."
+        #expect(MemoryMomentParser.hasPatternInsights(text) == true)
+    }
+
+    @Test("hasPatternInsights returns false for memory tags only")
+    func testHasPatternInsightsFalseForMemory() {
+        let text = "Given [MEMORY: honesty], what would you do?"
+        #expect(MemoryMomentParser.hasPatternInsights(text) == false)
+    }
+
+    @Test("hasPatternInsights returns false for empty string")
+    func testHasPatternInsightsEmpty() {
+        #expect(MemoryMomentParser.hasPatternInsights("") == false)
+    }
+
+    @Test("stripPatternTags removes pattern tags preserving content")
+    func testStripPatternTags() {
+        let text = "I see [PATTERN: a recurring theme] here."
+        let stripped = MemoryMomentParser.stripPatternTags(text)
+
+        #expect(stripped == "I see a recurring theme here.")
+    }
+
+    @Test("stripPatternTags preserves memory tags")
+    func testStripPatternTagsPreservesMemory() {
+        let text = "[MEMORY: honesty] and [PATTERN: theme]."
+        let stripped = MemoryMomentParser.stripPatternTags(text)
+
+        #expect(stripped == "[MEMORY: honesty] and theme.")
+    }
+
+    // MARK: - Story 3.4: String Extension Tests
+
+    @Test("String.coachingTags extension works")
+    func testStringCoachingTagsExtension() {
+        let text = "I see [PATTERN: a theme] and [MEMORY: your goal]."
+        let result = text.coachingTags
+
+        #expect(result.tags.count == 2)
+        #expect(result.hasPatternInsights == true)
+        #expect(result.hasMemoryMoments == true)
+    }
+
+    @Test("String.containsPatternInsights extension works")
+    func testStringContainsPatternInsightsExtension() {
+        #expect("Has [PATTERN: theme]".containsPatternInsights == true)
+        #expect("Regular text".containsPatternInsights == false)
     }
 }

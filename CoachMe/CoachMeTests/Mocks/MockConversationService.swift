@@ -19,8 +19,11 @@ final class MockConversationService: ConversationServiceProtocol {
     var updateConversationCalled = false
     var deleteConversationCalled = false
     var deleteAllConversationsCalled = false
+    var fetchConversationsCalled = false
+    var fetchMessagesCalled = false
 
     var lastDeletedConversationId: UUID?
+    var lastFetchedConversationId: UUID?
 
     // MARK: - Configurable Behavior
 
@@ -29,6 +32,14 @@ final class MockConversationService: ConversationServiceProtocol {
     var shouldThrowOnDeleteAll = false
     var deleteAllError: ConversationService.ConversationError = .deleteFailed("Mock error")
     var conversationExistsResult = true
+
+    var shouldThrowOnFetchConversations = false
+    var fetchConversationsError: ConversationService.ConversationError = .fetchFailed("Mock error")
+    var stubbedConversations: [ConversationService.Conversation] = []
+
+    var shouldThrowOnFetchMessages = false
+    var fetchMessagesError: ConversationService.ConversationError = .fetchFailed("Mock error")
+    var stubbedMessages: [ChatMessage] = []
 
     // MARK: - Protocol Implementation
 
@@ -76,6 +87,35 @@ final class MockConversationService: ConversationServiceProtocol {
         }
     }
 
+    nonisolated func fetchConversations() async throws -> [ConversationService.Conversation] {
+        let shouldThrow = await MainActor.run {
+            fetchConversationsCalled = true
+            return shouldThrowOnFetchConversations
+        }
+
+        if shouldThrow {
+            let error = await MainActor.run { fetchConversationsError }
+            throw error
+        }
+
+        return await MainActor.run { stubbedConversations }
+    }
+
+    nonisolated func fetchMessages(conversationId: UUID) async throws -> [ChatMessage] {
+        let shouldThrow = await MainActor.run {
+            fetchMessagesCalled = true
+            lastFetchedConversationId = conversationId
+            return shouldThrowOnFetchMessages
+        }
+
+        if shouldThrow {
+            let error = await MainActor.run { fetchMessagesError }
+            throw error
+        }
+
+        return await MainActor.run { stubbedMessages }
+    }
+
     // MARK: - Test Helpers
 
     func reset() {
@@ -85,9 +125,16 @@ final class MockConversationService: ConversationServiceProtocol {
         updateConversationCalled = false
         deleteConversationCalled = false
         deleteAllConversationsCalled = false
+        fetchConversationsCalled = false
+        fetchMessagesCalled = false
         lastDeletedConversationId = nil
+        lastFetchedConversationId = nil
         shouldThrowOnDelete = false
         shouldThrowOnDeleteAll = false
+        shouldThrowOnFetchConversations = false
+        shouldThrowOnFetchMessages = false
         conversationExistsResult = true
+        stubbedConversations = []
+        stubbedMessages = []
     }
 }

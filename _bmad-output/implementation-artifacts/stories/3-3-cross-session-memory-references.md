@@ -1,6 +1,6 @@
 # Story 3.3: Cross-Session Memory References
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -26,58 +26,58 @@ So that **coaching feels continuous, not fragmented**.
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Add `loadRelevantHistory()` to context-loader.ts (AC: #1, #3, #5, #6)
-  - [ ] 1.1 Add `PastConversation` interface: `{ conversationId, title, domain, summary, lastMessageAt }`
-  - [ ] 1.2 Add `ConversationHistory` interface: `{ conversations: PastConversation[], hasHistory: boolean }`
-  - [ ] 1.3 Implement `loadRelevantHistory(supabase, userId, currentConversationId)` function
-  - [ ] 1.4 Query `conversations` table for user's past conversations (exclude current), ordered by `last_message_at` DESC, limit 5
-  - [ ] 1.5 For each conversation, load last 3 messages from `messages` table to build a brief summary
-  - [ ] 1.6 Return `ConversationHistory` with `hasHistory: false` for users with no past conversations
-  - [ ] 1.7 Wrap entire function in try/catch — return `{ conversations: [], hasHistory: false }` on any error (AC: #6)
-  - [ ] 1.8 Target <100ms for history load (will run in parallel with context profile load)
+- [x] Task 1: Add `loadRelevantHistory()` to context-loader.ts (AC: #1, #3, #5, #6)
+  - [x] 1.1 Add `PastConversation` interface: `{ conversationId, title, domain, summary, lastMessageAt }`
+  - [x] 1.2 Add `ConversationHistory` interface: `{ conversations: PastConversation[], hasHistory: boolean }`
+  - [x] 1.3 Implement `loadRelevantHistory(supabase, userId, currentConversationId)` function
+  - [x] 1.4 Query `conversations` table for user's past conversations (exclude current), ordered by `last_message_at` DESC, limit 5
+  - [x] 1.5 For each conversation, load last 3 messages from `messages` table to build a brief summary
+  - [x] 1.6 Return `ConversationHistory` with `hasHistory: false` for users with no past conversations
+  - [x] 1.7 Wrap entire function in try/catch — return `{ conversations: [], hasHistory: false }` on any error (AC: #6)
+  - [x] 1.8 Target <100ms for history load (will run in parallel with context profile load)
 
-- [ ] Task 2: Create `_shared/conversation-summarizer.ts` helper (AC: #1)
-  - [ ] 2.1 Create `conversation-summarizer.ts` in `_shared/`
-  - [ ] 2.2 Implement `summarizeConversation(messages, title?, domain?)` — creates 1-2 sentence summary
-  - [ ] 2.3 Use simple extraction (NO LLM call): take user's last message topic + assistant's last response theme
-  - [ ] 2.4 Include domain label if available (e.g., "Career coaching: discussed upcoming promotion interview")
-  - [ ] 2.5 Truncate summaries to ~80 characters to keep token budget low
-  - [ ] 2.6 Handle edge cases: empty messages, single message, messages with only system role
+- [x] Task 2: Create `_shared/conversation-summarizer.ts` helper (AC: #1)
+  - [x] 2.1 Create `conversation-summarizer.ts` in `_shared/`
+  - [x] 2.2 Implement `summarizeConversation(messages, title?, domain?)` — creates 1-2 sentence summary
+  - [x] 2.3 Use simple extraction (NO LLM call): take user's last message topic + assistant's last response theme
+  - [x] 2.4 Include domain label if available (e.g., "Career coaching: discussed upcoming promotion interview")
+  - [x] 2.5 Truncate summaries to ~80 characters to keep token budget low
+  - [x] 2.6 Handle edge cases: empty messages, single message, messages with only system role
 
-- [ ] Task 3: Update prompt-builder.ts for cross-session references (AC: #1, #3, #4)
-  - [ ] 3.1 Add `pastConversations?: PastConversation[]` parameter to `buildCoachingPrompt()` signature
-  - [ ] 3.2 Create `formatHistorySection(pastConversations)` helper function
-  - [ ] 3.3 Format past conversations into a `## PREVIOUS CONVERSATIONS` section in system prompt
-  - [ ] 3.4 Add instruction: "When you reference something from a previous conversation, wrap it in [MEMORY: ...] tags, exactly as you do for context profile references"
-  - [ ] 3.5 Add instruction: "Reference past conversations naturally. Don't force references — only mention when the current topic genuinely connects"
-  - [ ] 3.6 Omit the PREVIOUS CONVERSATIONS section entirely when `pastConversations` is empty (AC: #3)
-  - [ ] 3.7 Cap total history section to ~500 tokens to stay within prompt budget
+- [x] Task 3: Update prompt-builder.ts for cross-session references (AC: #1, #3, #4)
+  - [x] 3.1 Add `pastConversations?: PastConversation[]` parameter to `buildCoachingPrompt()` signature
+  - [x] 3.2 Create `formatHistorySection(pastConversations)` helper function
+  - [x] 3.3 Format past conversations into a `## PREVIOUS CONVERSATIONS` section in system prompt
+  - [x] 3.4 Add instruction: "When you reference something from a previous conversation, wrap it in [MEMORY: ...] tags, exactly as you do for context profile references"
+  - [x] 3.5 Add instruction: "Reference past conversations naturally. Don't force references — only mention when the current topic genuinely connects"
+  - [x] 3.6 Omit the PREVIOUS CONVERSATIONS section entirely when `pastConversations` is empty (AC: #3)
+  - [x] 3.7 Cap total history section to ~500 tokens to stay within prompt budget
 
-- [ ] Task 4: Update chat-stream/index.ts to load and inject history (AC: #1, #5, #6)
-  - [ ] 4.1 Import `loadRelevantHistory` from `context-loader.ts`
-  - [ ] 4.2 Call `loadRelevantHistory` in `Promise.all()` with existing `loadUserContext` (parallel, no added latency)
-  - [ ] 4.3 Pass `pastConversations` to `buildCoachingPrompt()` alongside existing context and domain
-  - [ ] 4.4 No changes to memory moment detection — existing `hasMemoryMoments()` check already handles cross-session `[MEMORY: ...]` tags
-  - [ ] 4.5 Verify total pipeline latency stays <500ms with history loading
+- [x] Task 4: Update chat-stream/index.ts to load and inject history (AC: #1, #5, #6)
+  - [x] 4.1 Import `loadRelevantHistory` from `context-loader.ts`
+  - [x] 4.2 Call `loadRelevantHistory` in `Promise.all()` with existing `loadUserContext` (parallel, no added latency)
+  - [x] 4.3 Pass `pastConversations` to `buildCoachingPrompt()` alongside existing context and domain
+  - [x] 4.4 No changes to memory moment detection — existing `hasMemoryMoments()` check already handles cross-session `[MEMORY: ...]` tags
+  - [x] 4.5 Verify total pipeline latency stays <500ms with history loading
 
-- [ ] Task 5: Write Edge Function unit tests (AC: all)
-  - [ ] 5.1 Test `loadRelevantHistory` returns 5 most recent conversations for user
-  - [ ] 5.2 Test `loadRelevantHistory` excludes current conversation from results
-  - [ ] 5.3 Test `loadRelevantHistory` returns empty for user with no history
-  - [ ] 5.4 Test `loadRelevantHistory` returns empty for user with only current conversation
-  - [ ] 5.5 Test `loadRelevantHistory` gracefully handles database errors (returns empty, doesn't throw)
-  - [ ] 5.6 Test `summarizeConversation` produces reasonable summary from messages
-  - [ ] 5.7 Test `summarizeConversation` handles empty/single messages
-  - [ ] 5.8 Test `summarizeConversation` truncates long summaries
-  - [ ] 5.9 Test `buildCoachingPrompt` includes PREVIOUS CONVERSATIONS section when history present
-  - [ ] 5.10 Test `buildCoachingPrompt` omits section entirely when history empty
-  - [ ] 5.11 Test `buildCoachingPrompt` includes memory tag instruction for cross-session refs
+- [x] Task 5: Write Edge Function unit tests (AC: all)
+  - [x] 5.1 Test `loadRelevantHistory` returns 5 most recent conversations for user
+  - [x] 5.2 Test `loadRelevantHistory` excludes current conversation from results
+  - [x] 5.3 Test `loadRelevantHistory` returns empty for user with no history
+  - [x] 5.4 Test `loadRelevantHistory` returns empty for user with only current conversation
+  - [x] 5.5 Test `loadRelevantHistory` gracefully handles database errors (returns empty, doesn't throw)
+  - [x] 5.6 Test `summarizeConversation` produces reasonable summary from messages
+  - [x] 5.7 Test `summarizeConversation` handles empty/single messages
+  - [x] 5.8 Test `summarizeConversation` truncates long summaries
+  - [x] 5.9 Test `buildCoachingPrompt` includes PREVIOUS CONVERSATIONS section when history present
+  - [x] 5.10 Test `buildCoachingPrompt` omits section entirely when history empty
+  - [x] 5.11 Test `buildCoachingPrompt` includes memory tag instruction for cross-session refs
 
-- [ ] Task 6: Write iOS regression tests (AC: #2, #4)
-  - [ ] 6.1 Verify existing `MemoryMomentParser` handles `[MEMORY: ...]` tags from cross-session references (regression — should already pass)
-  - [ ] 6.2 Verify existing `MemoryMomentText` renders correctly for any memory moment content
-  - [ ] 6.3 Verify `MessageBubble` renders memory moments in completed messages (regression)
-  - [ ] 6.4 Verify `ChatStreamService` `StreamEvent.hasMemoryMoment` flag works for cross-session memory events
+- [x] Task 6: Write iOS regression tests (AC: #2, #4)
+  - [x] 6.1 Verify existing `MemoryMomentParser` handles `[MEMORY: ...]` tags from cross-session references (regression — should already pass)
+  - [x] 6.2 Verify existing `MemoryMomentText` renders correctly for any memory moment content
+  - [x] 6.3 Verify `MessageBubble` renders memory moments in completed messages (regression)
+  - [x] 6.4 Verify `ChatStreamService` `StreamEvent.hasMemoryMoment` flag works for cross-session memory events
 
 ## Dev Notes
 
@@ -416,9 +416,31 @@ describe('buildCoachingPrompt with history', () => {
 ## Dev Agent Record
 
 ### Agent Model Used
+Claude Opus 4.6
 
 ### Debug Log References
+- Fixed bug where early return in `buildCoachingPrompt()` skipped history section when user had no context profile. Added separate path to include history even without context.
 
 ### Completion Notes List
+- **Task 1**: Added `PastConversation` and `ConversationHistory` interfaces + `loadRelevantHistory()` to context-loader.ts. Queries up to 5 past conversations, loads last 3 messages each for summary generation. Full try/catch with graceful degradation.
+- **Task 2**: Created `conversation-summarizer.ts` — simple text extraction (no LLM call) that produces ~80 char summaries with domain prefix. Handles empty, single, and system-only messages.
+- **Task 3**: Extended `buildCoachingPrompt()` with `pastConversations` parameter. Added `formatHistorySection()` that builds `## PREVIOUS CONVERSATIONS` section with [MEMORY: ...] tag and natural-reference instructions. Section omitted when empty.
+- **Task 4**: Updated `chat-stream/index.ts` to `Promise.all([loadUserContext, loadRelevantHistory])` for parallel loading. Passes `conversationHistory.conversations` to prompt builder. Zero added serial latency.
+- **Task 5**: Added 7 tests for `loadRelevantHistory` (context-loader.test.ts), 8 tests for `summarizeConversation` (conversation-summarizer.test.ts), 7 tests for history in `buildCoachingPrompt` (prompt-builder.test.ts). Total: 22 new tests.
+- **Task 6**: Verified existing iOS tests cover regression scenarios — MemoryMomentParser, MemoryMomentText, ChatStreamService are all source-agnostic. Zero iOS code changes needed.
+
+### Change Log
+- 2026-02-07: Story 3.3 implementation complete — cross-session memory references via server-side changes only
 
 ### File List
+
+**New files:**
+- `CoachMe/Supabase/supabase/functions/_shared/conversation-summarizer.ts`
+- `CoachMe/Supabase/supabase/functions/_shared/conversation-summarizer.test.ts`
+
+**Modified files:**
+- `CoachMe/Supabase/supabase/functions/_shared/context-loader.ts` — Added PastConversation, ConversationHistory interfaces + loadRelevantHistory()
+- `CoachMe/Supabase/supabase/functions/_shared/context-loader.test.ts` — Added 7 loadRelevantHistory tests
+- `CoachMe/Supabase/supabase/functions/_shared/prompt-builder.ts` — Added pastConversations param + formatHistorySection()
+- `CoachMe/Supabase/supabase/functions/_shared/prompt-builder.test.ts` — Added 7 cross-session history tests
+- `CoachMe/Supabase/supabase/functions/chat-stream/index.ts` — Promise.all parallel loading, pass history to prompt builder

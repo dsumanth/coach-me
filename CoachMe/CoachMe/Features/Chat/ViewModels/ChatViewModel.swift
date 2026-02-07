@@ -5,6 +5,7 @@
 //  Created by Sumanth Daggubati on 2/6/26.
 //
 //  Story 2.4: Updated to track memory moments from streaming responses (AC #4)
+//  Story 3.4: Updated to track pattern insights from streaming responses
 //
 
 import Foundation
@@ -39,6 +40,9 @@ final class ChatViewModel {
     /// - Track analytics on memory moment frequency
     /// - Trigger haptic feedback when memory is referenced
     var currentResponseHasMemoryMoments = false
+
+    /// Story 3.4: Whether the current streaming response contains pattern insights
+    var currentResponseHasPatternInsights = false
 
     /// Current error (if any)
     var error: ChatError?
@@ -136,6 +140,7 @@ final class ChatViewModel {
         isStreaming = false
         streamingContent = ""
         currentResponseHasMemoryMoments = false  // Story 2.4: Reset memory moment tracking
+        currentResponseHasPatternInsights = false  // Story 3.4: Reset pattern insight tracking
         showError = false
         tokenBuffer?.reset()
 
@@ -165,11 +170,15 @@ final class ChatViewModel {
                     try Task.checkCancellation()
 
                     switch event {
-                    case .token(let content, let hasMemoryMoment):
+                    case .token(let content, let hasMemoryMoment, let hasPatternInsight):
                         tokenBuffer?.addToken(content)
                         // Story 2.4: Track if response contains memory moments (AC #4)
                         if hasMemoryMoment {
                             currentResponseHasMemoryMoments = true
+                        }
+                        // Story 3.4: Track if response contains pattern insights
+                        if hasPatternInsight {
+                            currentResponseHasPatternInsights = true
                         }
 
                     case .done(let messageId, _):
@@ -324,11 +333,47 @@ final class ChatViewModel {
         streamingContent = ""
         isStreaming = false
         currentResponseHasMemoryMoments = false  // Story 2.4: Reset memory moment tracking
+        currentResponseHasPatternInsights = false  // Story 3.4: Reset pattern insight tracking
         tokenBuffer?.reset()
         lastUserMessageContent = nil
         failedUserMessageIDs.removeAll()
         error = nil
         showError = false
+    }
+
+    /// Loads an existing conversation by fetching its messages (Story 3.6)
+    /// - Parameter id: The conversation ID to load
+    func loadConversation(id: UUID) async {
+        // Cancel any in-flight request
+        currentSendTask?.cancel()
+
+        // Reset state for the new conversation
+        isLoading = true
+        messages = []
+        currentConversationId = id
+        isConversationPersisted = true  // Conversation already exists in DB
+        inputText = ""
+        streamingContent = ""
+        isStreaming = false
+        currentResponseHasMemoryMoments = false
+        currentResponseHasPatternInsights = false
+        tokenBuffer?.reset()
+        lastUserMessageContent = nil
+        failedUserMessageIDs.removeAll()
+        error = nil
+        showError = false
+
+        defer { isLoading = false }
+
+        do {
+            messages = try await conversationService.fetchMessages(conversationId: id)
+        } catch let convError as ConversationService.ConversationError {
+            self.error = .messageFailed(convError)
+            showError = true
+        } catch {
+            self.error = .messageFailed(error)
+            showError = true
+        }
     }
 
     /// Refreshes the conversation (pull-to-refresh)

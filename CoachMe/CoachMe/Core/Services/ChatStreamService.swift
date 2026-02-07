@@ -5,6 +5,7 @@
 //  Created by Dev Agent on 2/6/26.
 //
 //  Story 2.4: Updated to parse memory_moment flag from SSE events (AC #4)
+//  Story 3.4: Updated to parse pattern_insight flag from SSE events
 //
 
 import Foundation
@@ -18,10 +19,12 @@ final class ChatStreamService {
 
     /// Events received from the SSE stream
     /// Story 2.4: Token event includes hasMemoryMoment flag for context injection
+    /// Story 3.4: Token event includes hasPatternInsight flag for pattern recognition
     enum StreamEvent: Decodable, Equatable {
-        /// Token with content and optional memory moment indicator
+        /// Token with content, memory moment indicator, and pattern insight indicator
         /// Story 2.4: hasMemoryMoment indicates if accumulated content contains [MEMORY:...] tags
-        case token(content: String, hasMemoryMoment: Bool)
+        /// Story 3.4: hasPatternInsight indicates if accumulated content contains [PATTERN:...] tags
+        case token(content: String, hasMemoryMoment: Bool, hasPatternInsight: Bool)
 
         /// Stream completed with message ID and usage stats
         case done(messageId: UUID, usage: TokenUsage)
@@ -45,6 +48,7 @@ final class ChatStreamService {
             case type
             case content
             case memoryMoment = "memory_moment"
+            case patternInsight = "pattern_insight"
             case messageId = "message_id"
             case usage
             case message
@@ -59,7 +63,9 @@ final class ChatStreamService {
                 let content = try container.decode(String.self, forKey: .content)
                 // Story 2.4: Parse memory_moment flag (defaults to false if not present)
                 let memoryMoment = try container.decodeIfPresent(Bool.self, forKey: .memoryMoment) ?? false
-                self = .token(content: content, hasMemoryMoment: memoryMoment)
+                // Story 3.4: Parse pattern_insight flag (defaults to false for backward compatibility)
+                let patternInsight = try container.decodeIfPresent(Bool.self, forKey: .patternInsight) ?? false
+                self = .token(content: content, hasMemoryMoment: memoryMoment, hasPatternInsight: patternInsight)
             case "done":
                 let messageId = try container.decode(UUID.self, forKey: .messageId)
                 let usage = try container.decode(TokenUsage.self, forKey: .usage)

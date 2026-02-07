@@ -38,6 +38,10 @@ struct RootView: View {
                 case .chat:
                     ChatView()
                         .transition(.opacity)
+
+                case .conversationList:
+                    ConversationListView()
+                        .transition(.opacity)
                 }
             }
             .animation(.easeInOut(duration: 0.3), value: router.currentScreen)

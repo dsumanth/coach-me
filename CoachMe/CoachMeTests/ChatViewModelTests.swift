@@ -273,3 +273,101 @@ struct ChatViewModelDeleteMockTests {
         #expect(viewModel.currentConversationId != originalId)
     }
 }
+
+// MARK: - Story 3.6: Load Conversation & Conversation Switching Tests
+
+@MainActor
+struct ChatViewModelConversationSwitchingTests {
+
+    @Test("loadConversation sets conversation ID and marks as persisted")
+    func testLoadConversationSetsId() async {
+        let mockService = MockConversationService()
+        let conversationId = UUID()
+        mockService.stubbedMessages = [
+            ChatMessage(
+                id: UUID(),
+                conversationId: conversationId,
+                role: .user,
+                content: "Hello",
+                createdAt: Date()
+            ),
+            ChatMessage(
+                id: UUID(),
+                conversationId: conversationId,
+                role: .assistant,
+                content: "Hi there",
+                createdAt: Date()
+            )
+        ]
+
+        let viewModel = ChatViewModel(conversationService: mockService)
+
+        await viewModel.loadConversation(id: conversationId)
+
+        #expect(viewModel.currentConversationId == conversationId)
+        #expect(viewModel.messages.count == 2)
+        #expect(viewModel.messages[0].role == .user)
+        #expect(viewModel.messages[1].role == .assistant)
+        #expect(!viewModel.isLoading)
+        #expect(mockService.fetchMessagesCalled)
+        #expect(mockService.lastFetchedConversationId == conversationId)
+    }
+
+    @Test("loadConversation clears previous state")
+    func testLoadConversationClearsState() async {
+        let mockService = MockConversationService()
+        let viewModel = ChatViewModel(conversationService: mockService)
+
+        // Simulate some existing state
+        viewModel.inputText = "some text"
+        viewModel.error = .networkUnavailable
+        viewModel.showError = true
+
+        let newConversationId = UUID()
+        await viewModel.loadConversation(id: newConversationId)
+
+        #expect(viewModel.inputText.isEmpty)
+        #expect(viewModel.error == nil || !viewModel.showError)
+        #expect(viewModel.streamingContent.isEmpty)
+        #expect(!viewModel.isStreaming)
+    }
+
+    @Test("loadConversation shows error on fetch failure")
+    func testLoadConversationError() async {
+        let mockService = MockConversationService()
+        mockService.shouldThrowOnFetchMessages = true
+        mockService.fetchMessagesError = .fetchFailed("Connection lost")
+
+        let viewModel = ChatViewModel(conversationService: mockService)
+        await viewModel.loadConversation(id: UUID())
+
+        #expect(viewModel.messages.isEmpty)
+        #expect(viewModel.showError)
+        #expect(viewModel.error != nil)
+    }
+
+    @Test("startNewConversation preserves previous conversation by generating new ID")
+    func testStartNewConversationPreservesOld() {
+        let mockService = MockConversationService()
+        let viewModel = ChatViewModel(conversationService: mockService)
+        let originalId = viewModel.currentConversationId
+
+        viewModel.startNewConversation()
+
+        #expect(viewModel.currentConversationId != nil)
+        #expect(viewModel.currentConversationId != originalId)
+        #expect(viewModel.messages.isEmpty)
+    }
+
+    @Test("loadConversation with empty messages sets empty list")
+    func testLoadConversationEmptyMessages() async {
+        let mockService = MockConversationService()
+        mockService.stubbedMessages = []
+
+        let viewModel = ChatViewModel(conversationService: mockService)
+        await viewModel.loadConversation(id: UUID())
+
+        #expect(viewModel.messages.isEmpty)
+        #expect(!viewModel.isLoading)
+    }
+}

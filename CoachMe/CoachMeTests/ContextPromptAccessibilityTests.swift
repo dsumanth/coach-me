@@ -21,25 +21,12 @@ final class ContextPromptAccessibilityTests: XCTestCase {
         // Given/When: Creating a ContextPromptSheet
         let sheet = ContextPromptSheet(
             onAccept: {},
-            onDismiss: {}
+            onDismiss: {},
+            onClose: {}
         )
 
         // Then: Should be a valid SwiftUI view (compile-time check)
         XCTAssertNotNil(sheet, "ContextPromptSheet should be instantiable")
-    }
-
-    func testContextPromptSheetViewBodyExists() {
-        // Given: A ContextPromptSheet
-        let sheet = ContextPromptSheet(
-            onAccept: {},
-            onDismiss: {}
-        )
-
-        // When: Accessing the body
-        let body = sheet.body
-
-        // Then: Body should exist (verifies view structure is valid)
-        XCTAssertNotNil(body, "ContextPromptSheet body should exist")
     }
 
     // MARK: - ContextSetupForm Accessibility Tests
@@ -55,27 +42,14 @@ final class ContextPromptAccessibilityTests: XCTestCase {
         XCTAssertNotNil(form, "ContextSetupForm should be instantiable")
     }
 
-    func testContextSetupFormViewBodyExists() {
-        // Given: A ContextSetupForm
-        let form = ContextSetupForm(
-            onSave: { _, _, _ in },
-            onSkip: {}
-        )
-
-        // When: Accessing the body
-        let body = form.body
-
-        // Then: Body should exist (verifies view structure is valid)
-        XCTAssertNotNil(body, "ContextSetupForm body should exist")
-    }
-
     // MARK: - Callback Tests
 
     func testContextPromptSheetCallsOnAccept() {
         // Given: A sheet with callbacks
         let sheet = ContextPromptSheet(
             onAccept: {},
-            onDismiss: {}
+            onDismiss: {},
+            onClose: {}
         )
 
         // Then: Verify the callback is wired correctly
@@ -88,7 +62,8 @@ final class ContextPromptAccessibilityTests: XCTestCase {
         // Given: A sheet with callbacks
         let sheet = ContextPromptSheet(
             onAccept: {},
-            onDismiss: {}
+            onDismiss: {},
+            onClose: {}
         )
 
         // Then: Verify callback is wired

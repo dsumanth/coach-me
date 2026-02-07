@@ -65,13 +65,13 @@ development_status:
 
   # ── Epic 3: Intelligent Domain Routing & Pattern Recognition (7 stories) ──
   epic-3: in-progress
-  3-1-invisible-domain-routing: ready-for-dev
-  3-2-domain-configuration-engine: backlog
-  3-3-cross-session-memory-references: ready-for-dev
-  3-4-pattern-recognition-across-conversations: backlog
-  3-5-cross-domain-pattern-synthesis: backlog
-  3-6-multiple-conversation-threads: ready-for-dev
-  3-7-conversation-history-view: ready-for-dev
+  3-1-invisible-domain-routing: review
+  3-2-domain-configuration-engine: review
+  3-3-cross-session-memory-references: review
+  3-4-pattern-recognition-across-conversations: review
+  3-5-cross-domain-pattern-synthesis: review
+  3-6-multiple-conversation-threads: review
+  3-7-conversation-history-view: review
   epic-3-retrospective: optional
 
   # ── Epic 4: Coaching Safety & Crisis Handling (5 stories) ──

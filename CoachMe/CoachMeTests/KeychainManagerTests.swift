@@ -13,10 +13,10 @@ final class KeychainManagerTests: XCTestCase {
 
     private let manager = KeychainManager.shared
 
-    override func tearDown() {
+    override func tearDown() async throws {
         // Clean up after each test
         try? manager.clearAllAuthData()
-        super.tearDown()
+        try await super.tearDown()
     }
 
     // MARK: - Save and Load Tests
