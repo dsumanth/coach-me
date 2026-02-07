@@ -92,8 +92,8 @@ final class ContextExtractionServiceTests: XCTestCase {
                 conversationId: conversationId,
                 messages: messages
             )
-            // Empty messages might return empty results or throw
-            XCTAssertTrue(result.isEmpty || true, "Should handle empty messages")
+            // Empty messages may return empty results - just verify no crash
+            _ = result
         } catch {
             // Network error expected in test environment without real API
             // This is acceptable behavior

@@ -29,7 +29,7 @@ struct StreamingTokenBufferTests {
     // MARK: - Token Accumulation Tests
 
     @Test("addToken accumulates tokens")
-    func testAddTokenAccumulates() async {
+    func testAddTokenAccumulates() {
         let buffer = StreamingTokenBuffer()
         var flushedContent = ""
         buffer.onFlush = { flushedContent += $0 }

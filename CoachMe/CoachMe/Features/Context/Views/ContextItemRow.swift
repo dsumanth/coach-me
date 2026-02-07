@@ -125,8 +125,7 @@ struct ContextItemRow: View {
         }
         .padding(.vertical, DesignConstants.Spacing.sm)
         .padding(.horizontal, DesignConstants.Spacing.md)
-        .background(Color.adaptiveSurface(colorScheme))
-        .clipShape(RoundedRectangle(cornerRadius: DesignConstants.CornerRadius.standard))
+        .modifier(ContextRowSurfaceModifier(colorScheme: colorScheme))
         .contentShape(Rectangle())
         .onTapGesture {
             onEdit()
@@ -135,6 +134,9 @@ struct ContextItemRow: View {
         .accessibilityLabel(accessibilityDescription)
         .accessibilityHint("Double tap to edit")
         .accessibilityAddTraits(.isButton)
+        .accessibilityAction(named: "Delete") {
+            onDelete()
+        }
     }
 
     // MARK: - Computed Properties
@@ -144,6 +146,33 @@ struct ContextItemRow: View {
             return "\(content). Status: \(badge)"
         }
         return content
+    }
+}
+
+private struct ContextRowSurfaceModifier: ViewModifier {
+    let colorScheme: ColorScheme
+
+    func body(content: Content) -> some View {
+        let shape = RoundedRectangle(cornerRadius: DesignConstants.CornerRadius.standard, style: .continuous)
+        if #available(iOS 26, *) {
+            content
+                .background {
+                    shape
+                        .fill(.clear)
+                        .glassEffect(.regular, in: shape)
+                    shape
+                        .fill(Color.white.opacity(colorScheme == .dark ? 0.018 : 0.028))
+                }
+                .overlay(
+                    shape
+                        .stroke(Color.white.opacity(colorScheme == .dark ? 0.18 : 0.24), lineWidth: 1)
+                )
+                .clipShape(shape)
+        } else {
+            content
+                .background(Color.adaptiveSurface(colorScheme))
+                .clipShape(shape)
+        }
     }
 }
 

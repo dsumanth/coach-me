@@ -15,12 +15,8 @@ enum BuildEnvironment: String {
 }
 
 struct Configuration {
-    /// Current environment - determined by build configuration
-    /// To set up different environments:
-    /// 1. In Xcode, go to Project > Build Settings
-    /// 2. Add a user-defined setting: COACH_ENV = development | staging | production
-    /// 3. In Info.plist, add: CoachEnvironment = $(COACH_ENV)
-    /// 4. Create separate schemes for each environment
+    /// Current environment - determined by xcconfig (CoachEnvironment key in Info.plist)
+    /// Set INFOPLIST_KEY_CoachEnvironment in Debug.xcconfig / Release.xcconfig
     static let current: BuildEnvironment = {
         // Check Info.plist for environment override
         if let envString = Bundle.main.infoDictionary?["CoachEnvironment"] as? String,
@@ -36,32 +32,22 @@ struct Configuration {
         #endif
     }()
 
+    /// Supabase URL - read from Info.plist (injected via xcconfig)
+    /// Set values in Debug.xcconfig / Release.xcconfig (see Config.xcconfig.template)
     static var supabaseURL: String {
-        switch current {
-        case .development:
-            return "https://xzsvzbjxlsnhxyrglvjp.supabase.co"
-        case .staging:
-            // FIXME: Set staging Supabase URL before deploying to TestFlight
-            return envValue(for: "SUPABASE_URL_STAGING") ?? "https://STAGING-PROJECT.supabase.co"
-        case .production:
-            // FIXME: Set production Supabase URL before App Store release
-            return envValue(for: "SUPABASE_URL_PRODUCTION") ?? "https://PRODUCTION-PROJECT.supabase.co"
+        guard let url = envValue(for: "SupabaseURL"), !url.isEmpty else {
+            fatalError("SupabaseURL not configured. Copy Config.xcconfig.template to Debug.xcconfig and fill in your values.")
         }
+        return url
     }
 
-    /// Supabase Publishable API Key (replaces legacy anon key)
+    /// Supabase Publishable API Key - read from Info.plist (injected via xcconfig)
     /// Safe for use in client applications - see https://supabase.com/docs/guides/api/api-keys
     static var supabasePublishableKey: String {
-        switch current {
-        case .development:
-            return "sb_publishable_30dBxpAQbw1rOc8TW0WvQA_JNkRFqIt"
-        case .staging:
-            // FIXME: Set staging publishable key before deploying to TestFlight
-            return envValue(for: "SUPABASE_KEY_STAGING") ?? "sb_publishable_STAGING_KEY"
-        case .production:
-            // FIXME: Set production publishable key before App Store release
-            return envValue(for: "SUPABASE_KEY_PRODUCTION") ?? "sb_publishable_PRODUCTION_KEY"
+        guard let key = envValue(for: "SupabasePublishableKey"), !key.isEmpty else {
+            fatalError("SupabasePublishableKey not configured. Copy Config.xcconfig.template to Debug.xcconfig and fill in your values.")
         }
+        return key
     }
 
     /// Read environment variable from Info.plist (set via xcconfig or build settings)
@@ -79,11 +65,11 @@ struct Configuration {
     /// - Returns: true if configuration appears valid
     static func validateConfiguration() -> Bool {
         let urlValid = supabaseURL.contains("supabase.co") &&
-                       !supabaseURL.contains("STAGING-PROJECT") &&
+                       !supabaseURL.contains("YOUR_PROJECT") &&
                        !supabaseURL.contains("PRODUCTION-PROJECT")
 
         let keyValid = supabasePublishableKey.hasPrefix("sb_publishable_") &&
-                       !supabasePublishableKey.contains("STAGING_KEY") &&
+                       !supabasePublishableKey.contains("YOUR_KEY_HERE") &&
                        !supabasePublishableKey.contains("PRODUCTION_KEY")
 
         let isValid = urlValid && keyValid
@@ -95,17 +81,16 @@ struct Configuration {
         } else {
             print("⚠️ Configuration Warning: Supabase credentials may not be properly configured")
             if !urlValid {
-                print("   - Supabase URL needs to be set for \(current.rawValue) environment")
+                print("   - Supabase URL needs to be set in xcconfig for \(current.rawValue) environment")
             }
             if !keyValid {
-                print("   - Supabase key needs to be set for \(current.rawValue) environment")
+                print("   - Supabase key needs to be set in xcconfig for \(current.rawValue) environment")
             }
         }
         #endif
 
-        // In non-debug builds for staging/production, fail loudly if not configured
         #if !DEBUG
-        if current != .development && !isValid {
+        if !isValid {
             assertionFailure("Configuration Error: Supabase credentials not properly configured for \(current.rawValue)")
         }
         #endif

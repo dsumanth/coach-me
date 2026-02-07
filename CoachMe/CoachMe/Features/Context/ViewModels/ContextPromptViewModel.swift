@@ -8,12 +8,35 @@
 
 import Foundation
 
+// MARK: - Cooldown Storage Abstraction
+
+/// Abstraction over date persistence for prompt cooldown tracking.
+/// Injected so cooldown logic is testable in all build configurations.
+protocol CooldownStorage {
+    func date(forKey key: String) -> Date?
+    func setDate(_ date: Date, forKey key: String)
+}
+
+/// Production implementation backed by UserDefaults.
+struct UserDefaultsCooldownStorage: CooldownStorage {
+    func date(forKey key: String) -> Date? {
+        UserDefaults.standard.object(forKey: key) as? Date
+    }
+
+    func setDate(_ date: Date, forKey key: String) {
+        UserDefaults.standard.set(date, forKey: key)
+    }
+}
+
 /// ViewModel for managing the context setup prompt flow
 /// Handles prompt display logic, dismissal tracking, and context saving
 @MainActor
 @Observable
 final class ContextPromptViewModel {
     // MARK: - Published State
+
+    /// Whether the inline suggestion chip should be shown
+    var showSuggestionChip = false
 
     /// Whether the context prompt sheet should be shown
     var showPrompt = false
@@ -44,6 +67,7 @@ final class ContextPromptViewModel {
     // MARK: - Dependencies
 
     private let contextRepository: any ContextRepositoryProtocol
+    private let cooldownStorage: any CooldownStorage
 
     // MARK: - Constants
 
@@ -53,10 +77,17 @@ final class ContextPromptViewModel {
     /// Minimum messages in a session to count as "completed"
     private static let messagesPerSession = 2  // 1 user + 1 AI response
 
+    /// Frequency cap to avoid prompting too often
+    private static let promptCooldownDays = 7
+
     // MARK: - Initialization
 
-    init(contextRepository: any ContextRepositoryProtocol = ContextRepository.shared) {
+    init(
+        contextRepository: any ContextRepositoryProtocol = ContextRepository.shared,
+        cooldownStorage: any CooldownStorage = UserDefaultsCooldownStorage()
+    ) {
         self.contextRepository = contextRepository
+        self.cooldownStorage = cooldownStorage
     }
 
     // MARK: - Public Methods
@@ -65,6 +96,9 @@ final class ContextPromptViewModel {
     /// - Parameter userId: The authenticated user's ID
     func configure(userId: UUID) async {
         self.userId = userId
+        showSuggestionChip = false
+        showPrompt = false
+        showSetupForm = false
 
         // Load the user's context profile
         do {
@@ -86,8 +120,10 @@ final class ContextPromptViewModel {
         // Only check after first complete exchange (user message + AI response)
         guard sessionMessageCount >= Self.messagesPerSession else { return }
 
-        if shouldShowPrompt() {
-            showPrompt = true
+        guard !showSuggestionChip, !showPrompt, !showSetupForm else { return }
+
+        if shouldShowPrompt() && (!shouldApplyPromptCooldown() || !isWithinPromptCooldown()) {
+            showSuggestionChip = true
         }
     }
 
@@ -121,12 +157,27 @@ final class ContextPromptViewModel {
 
     /// Called when user accepts the prompt ("Yes, remember me")
     func acceptPrompt() {
+        showSuggestionChip = false
         showPrompt = false
         showSetupForm = true
     }
 
+    /// Opens the context prompt sheet from the inline suggestion chip
+    func openPromptFromSuggestion() {
+        guard showSuggestionChip else { return }
+        showSuggestionChip = false
+        showPrompt = true
+        recordPromptPresentedNow()
+    }
+
+    /// Dismisses the inline suggestion chip without counting as an explicit prompt dismissal
+    func dismissSuggestionChip() {
+        showSuggestionChip = false
+    }
+
     /// Called when user dismisses the prompt ("Not now")
     func dismissPrompt() async {
+        showSuggestionChip = false
         showPrompt = false
 
         guard let userId = userId else { return }
@@ -218,5 +269,35 @@ final class ContextPromptViewModel {
     /// Resets the session message count (e.g., when starting a new conversation)
     func resetSessionCount() {
         sessionMessageCount = 0
+    }
+
+    // MARK: - Prompt Cooldown
+
+    private var promptCooldownInterval: TimeInterval {
+        TimeInterval(Self.promptCooldownDays * 24 * 60 * 60)
+    }
+
+    private func promptShownAtKey(for userId: UUID) -> String {
+        "context_prompt.last_shown_at.\(userId.uuidString)"
+    }
+
+    private func isWithinPromptCooldown() -> Bool {
+        guard let userId = userId else { return false }
+        guard let lastShown = cooldownStorage.date(forKey: promptShownAtKey(for: userId)) else {
+            return false
+        }
+        return Date().timeIntervalSince(lastShown) < promptCooldownInterval
+    }
+
+    private func recordPromptPresentedNow() {
+        guard let userId = userId else { return }
+        cooldownStorage.setDate(Date(), forKey: promptShownAtKey(for: userId))
+    }
+
+    /// Apply cooldown only for re-prompts after first-session completion.
+    /// First-time prompts should not be throttled.
+    private func shouldApplyPromptCooldown() -> Bool {
+        guard let profile = profile else { return false }
+        return profile.firstSessionComplete
     }
 }

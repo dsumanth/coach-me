@@ -191,6 +191,8 @@ actor VoiceInputService {
         recognitionRequest?.endAudio()
 
         // Clean up references but let the recognition task complete naturally
+        // Note: recognitionTask is intentionally NOT set to nil here - it will
+        // complete asynchronously and is cleaned up in the next startRecording call
         recognitionRequest = nil
         audioEngine = nil
         state = .idle

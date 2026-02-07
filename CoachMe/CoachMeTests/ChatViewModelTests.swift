@@ -204,8 +204,8 @@ struct ChatViewModelDeleteMockTests {
         #expect(viewModel.messages.isEmpty)
     }
 
-    @Test("deleteConversation returns false and shows error on service failure")
-    func testDeleteConversationFailure() async {
+    @Test("deleteConversation succeeds for non-persisted conversation even with failing service")
+    func testDeleteConversationNonPersistedWithFailingService() async {
         // Given: ViewModel with mock service that will fail
         // We need to test the error path, which requires the conversation to be persisted
         // Since we can't easily simulate persistence, we test the error handling directly

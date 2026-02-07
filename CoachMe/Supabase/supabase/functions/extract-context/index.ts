@@ -9,7 +9,7 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { handleCors, corsHeaders } from '../_shared/cors.ts';
-import { verifyAuth } from '../_shared/auth.ts';
+import { verifyAuth, AuthorizationError } from '../_shared/auth.ts';
 import { errorResponse } from '../_shared/response.ts';
 import { calculateCost } from '../_shared/llm-client.ts';
 import { logUsage } from '../_shared/cost-tracker.ts';
@@ -177,8 +177,7 @@ serve(async (req: Request) => {
   } catch (error) {
     console.error('extract-context error:', error);
 
-    if ((error as Error).message.includes('authorization') ||
-        (error as Error).message.includes('token')) {
+    if (error instanceof AuthorizationError) {
       return errorResponse('Not authorized', 401);
     }
 

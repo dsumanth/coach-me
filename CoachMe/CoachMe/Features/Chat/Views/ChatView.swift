@@ -36,6 +36,7 @@ struct ChatView: View {
 
     /// Whether to show the settings view (Story 2.6)
     @State private var showSettings = false
+    @Environment(\.colorScheme) private var colorScheme
 
     // MARK: - Initialization
 
@@ -54,7 +55,7 @@ struct ChatView: View {
     var body: some View {
         ZStack {
             // Warm background
-            Color.cream
+            Color.adaptiveCream(colorScheme)
                 .ignoresSafeArea()
 
             VStack(spacing: 0) {
@@ -67,15 +68,31 @@ struct ChatView: View {
                 } else {
                     messageList
                 }
-
-                // Input area with voice support
-                MessageInput(viewModel: viewModel, voiceViewModel: voiceViewModel)
             }
 
             // History coming soon toast
             if showHistoryToast {
                 historyToast
                     .transition(.move(edge: .top).combined(with: .opacity))
+            }
+
+            if contextPromptViewModel.showPrompt {
+                contextPromptOverlay
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .zIndex(20)
+            }
+        }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if shouldShowComposer {
+                VStack(spacing: 0) {
+                    if contextPromptViewModel.showSuggestionChip {
+                        contextSuggestionChip
+                            .transition(.move(edge: .bottom).combined(with: .opacity))
+                    }
+
+                    MessageInput(viewModel: viewModel, voiceViewModel: voiceViewModel)
+                }
+                .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
         // Chat error alert
@@ -112,21 +129,6 @@ struct ChatView: View {
                 },
                 onDismiss: {
                     voiceViewModel.dismissPermissionSheet()
-                }
-            )
-            .presentationDetents([.medium])
-            .presentationDragIndicator(.visible)
-        }
-        // Context prompt sheet (Story 2.2)
-        .sheet(isPresented: $contextPromptViewModel.showPrompt) {
-            ContextPromptSheet(
-                onAccept: {
-                    contextPromptViewModel.acceptPrompt()
-                },
-                onDismiss: {
-                    Task {
-                        await contextPromptViewModel.dismissPrompt()
-                    }
                 }
             )
             .presentationDetents([.medium])
@@ -191,7 +193,10 @@ struct ChatView: View {
             Text(insightSuggestionsViewModel.error?.errorDescription ?? "Something went wrong with insights")
         }
         // Context profile sheet (Story 2.5)
-        .sheet(isPresented: $showContextProfile) {
+        .sheet(isPresented: Binding(
+            get: { showContextProfile && contextPromptViewModel.userId != nil },
+            set: { showContextProfile = $0 }
+        )) {
             if let userId = contextPromptViewModel.userId {
                 ContextProfileView(userId: userId)
             }
@@ -225,6 +230,9 @@ struct ChatView: View {
         .onChange(of: viewModel.isStreaming) { wasStreaming, isStreaming in
             // When streaming ends (transitions from true to false)
             if wasStreaming && !isStreaming {
+                // Only trigger post-response flows when an assistant message was actually delivered.
+                guard viewModel.messages.last?.role == .assistant else { return }
+
                 // Trigger context prompt (Story 2.2)
                 contextPromptViewModel.onAIResponseReceived()
 
@@ -235,6 +243,16 @@ struct ChatView: View {
                         messages: viewModel.messages
                     )
                 }
+            }
+        }
+        .onChange(of: contextPromptViewModel.showPrompt) { _, isShowingPrompt in
+            if isShowingPrompt {
+                dismissKeyboard()
+            }
+        }
+        .onChange(of: shouldShowComposer) { _, isVisible in
+            if !isVisible {
+                dismissKeyboard()
             }
         }
         .task {
@@ -260,105 +278,160 @@ struct ChatView: View {
         }
     }
 
+    /// Full-screen overlay for the context prompt.
+    /// Uses a single custom pane instead of system sheet chrome to keep liquid-glass appearance.
+    private var contextPromptOverlay: some View {
+        GeometryReader { proxy in
+            ZStack(alignment: .bottom) {
+                Color.black.opacity(promptBackdropOpacity)
+                    .ignoresSafeArea()
+
+                ContextPromptSheet(
+                    onAccept: {
+                        contextPromptViewModel.acceptPrompt()
+                    },
+                    onDismiss: {
+                        Task {
+                            await contextPromptViewModel.dismissPrompt()
+                        }
+                    },
+                    onClose: {
+                        Task {
+                            await contextPromptViewModel.dismissPrompt()
+                        }
+                    }
+                )
+                .padding(.horizontal, 16)
+                .padding(.bottom, max(proxy.safeAreaInsets.bottom, 12))
+            }
+        }
+        .ignoresSafeArea(edges: .bottom)
+        .onAppear {
+            dismissKeyboard()
+        }
+    }
+
+    private var promptBackdropOpacity: Double {
+        if #available(iOS 26, *) {
+            return 0.05
+        } else {
+            return 0.10
+        }
+    }
+
     // MARK: - Toolbar
 
     /// Adaptive toolbar with history, insights, and new conversation buttons
     private var chatToolbar: some View {
-        HStack {
-            // History button
-            Button(action: showHistoryComingSoon) {
-                Image(systemName: "clock.arrow.circlepath")
-                    .font(.system(size: 20, weight: .medium))
-                    .foregroundStyle(Color.warmGray700)
-                    .frame(width: 44, height: 44)
-            }
-            .adaptiveInteractiveGlass()
-            .accessibilityLabel("View conversation history")
-            .accessibilityHint("Opens your past conversations. Coming soon.")
-
-            // Insights indicator (Story 2.3) - shows when pending insights exist
-            if insightSuggestionsViewModel.hasPendingInsights {
-                Button(action: showInsightsSuggestions) {
-                    ZStack(alignment: .topTrailing) {
-                        Image(systemName: "sparkles")
-                            .font(.system(size: 18, weight: .medium))
-                            .foregroundStyle(Color.terracotta)
-                            .frame(width: 44, height: 44)
-
-                        // Badge with count
-                        if insightSuggestionsViewModel.pendingCount > 0 {
-                            Text("\(min(insightSuggestionsViewModel.pendingCount, 9))")
-                                .font(.system(size: 11, weight: .bold))
-                                .foregroundStyle(.white)
-                                .frame(width: 18, height: 18)
-                                .background(Color.terracotta)
-                                .clipShape(Circle())
-                                .offset(x: 6, y: 4)
-                        }
-                    }
-                }
-                .adaptiveInteractiveGlass()
-                .accessibilityLabel("View insights")
-                .accessibilityHint("You have \(insightSuggestionsViewModel.pendingCount) insights I'd like to confirm with you")
-                .transition(.scale.combined(with: .opacity))
-            }
-
-            Spacer()
-
+        ZStack {
             // App title
             Text("Coach")
                 .font(.system(size: 20, weight: .semibold, design: .rounded))
-                .foregroundColor(Color.warmGray900)
+                .foregroundColor(Color.adaptiveText(colorScheme))
 
-            Spacer()
-
-            // Profile button (Story 2.5)
-            Button(action: showProfile) {
-                Image(systemName: "person.crop.circle")
-                    .font(.system(size: 20, weight: .medium))
-                    .foregroundStyle(Color.warmGray700)
-                    .frame(width: 44, height: 44)
-            }
-            .adaptiveInteractiveGlass()
-            .accessibilityLabel("View your profile")
-            .accessibilityHint("Opens your context profile to see what I remember about you")
-
-            // More options menu (Story 2.6)
-            Menu {
-                // Delete current conversation (Task 4.1)
-                Button(role: .destructive) {
-                    viewModel.showDeleteConfirmation = true
-                } label: {
-                    Label("Delete conversation", systemImage: "trash")
-                }
-                .accessibilityHint("Shows confirmation to delete this conversation")
-
-                // Settings (Task 5.5)
+            HStack {
+                // New conversation button
                 Button {
-                    showSettings = true
+                    startNewConversation()
                 } label: {
-                    Label("Settings", systemImage: "gearshape")
+                    ZStack {
+                        Circle()
+                            .fill(
+                                colorScheme == .dark
+                                    ? Color.warmGray700.opacity(0.42)
+                                    : Color.white.opacity(0.78)
+                            )
+                        Circle()
+                            .stroke(
+                                colorScheme == .dark
+                                    ? Color.white.opacity(0.2)
+                                    : Color.black.opacity(0.08),
+                                lineWidth: 1
+                            )
+                        Image(systemName: "plus.bubble")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(Color.adaptiveText(colorScheme, isPrimary: false))
+                    }
+                    .frame(width: 36, height: 36)
                 }
-            } label: {
-                Image(systemName: "ellipsis.circle")
-                    .font(.system(size: 20, weight: .medium))
-                    .foregroundStyle(Color.warmGray700)
-                    .frame(width: 44, height: 44)
-            }
-            .adaptiveInteractiveGlass()
-            .accessibilityLabel("More options")
-            .accessibilityHint("Opens menu with delete and settings options")
+                .accessibilityLabel("New conversation")
+                .accessibilityHint("Starts a new coaching conversation")
 
-            // New conversation button
-            Button(action: startNewConversation) {
-                Image(systemName: "plus.bubble")
-                    .font(.system(size: 20, weight: .medium))
-                    .foregroundStyle(Color.warmGray700)
-                    .frame(width: 44, height: 44)
+                Spacer()
+
+                // Overflow menu for secondary/occasional actions
+                Menu {
+                    Button {
+                        showProfile()
+                    } label: {
+                        Label("Your profile", systemImage: "person.crop.circle")
+                    }
+
+                    if insightSuggestionsViewModel.hasPendingInsights {
+                        Button {
+                            showInsightsSuggestions()
+                        } label: {
+                            Label(
+                                "Review insights (\(insightSuggestionsViewModel.pendingCount))",
+                                systemImage: "sparkles"
+                            )
+                        }
+                    }
+
+                    Button {
+                        showHistoryComingSoon()
+                    } label: {
+                        Label("Conversation history", systemImage: "clock.arrow.circlepath")
+                    }
+
+                    Button {
+                        showSettings = true
+                    } label: {
+                        Label("Settings", systemImage: "gearshape")
+                    }
+
+                    Button(role: .destructive) {
+                        viewModel.showDeleteConfirmation = true
+                    } label: {
+                        Label("Delete conversation", systemImage: "trash")
+                    }
+                    .accessibilityHint("Shows confirmation to delete this conversation")
+                } label: {
+                    ZStack(alignment: .topTrailing) {
+                        ZStack {
+                            Circle()
+                                .fill(
+                                    colorScheme == .dark
+                                        ? Color.warmGray700.opacity(0.42)
+                                        : Color.white.opacity(0.78)
+                                )
+                            Circle()
+                                .stroke(
+                                    colorScheme == .dark
+                                        ? Color.white.opacity(0.2)
+                                        : Color.black.opacity(0.08),
+                                    lineWidth: 1
+                                )
+                            Image(systemName: "ellipsis")
+                                .font(.system(size: 15, weight: .semibold))
+                                .foregroundStyle(Color.adaptiveText(colorScheme, isPrimary: false))
+                        }
+                        .frame(width: 36, height: 36)
+
+                        if insightSuggestionsViewModel.pendingCount > 0 {
+                            Text("\(min(insightSuggestionsViewModel.pendingCount, 9))")
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundStyle(.white)
+                                .frame(width: 16, height: 16)
+                                .background(Color.terracotta)
+                                .clipShape(Circle())
+                                .offset(x: 4, y: -2)
+                        }
+                    }
+                }
+                .accessibilityLabel("More options")
+                .accessibilityHint("Opens conversation actions, settings, and history")
             }
-            .adaptiveInteractiveGlass()
-            .accessibilityLabel("Start new conversation")
-            .accessibilityHint("Starts a fresh conversation with your coach")
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
@@ -373,36 +446,31 @@ struct ChatView: View {
             ScrollView {
                 LazyVStack(spacing: 0) {
                     ForEach(viewModel.messages) { message in
-                        MessageBubble(message: message)
+                        MessageBubble(
+                            message: message,
+                            isFailedToSend: message.isFromUser && viewModel.isMessageDeliveryFailed(message.id),
+                            onRetry: message.isFromUser ? {
+                                Task {
+                                    await viewModel.retryFailedMessage(message.id)
+                                }
+                            } : nil
+                        )
                             .id(message.id)
                     }
 
-                    // Typing indicator when loading but not yet streaming
-                    if viewModel.isLoading && !viewModel.isStreaming {
+                    // iMessage-style typing indicator while coach is preparing a response.
+                    if viewModel.isLoading || viewModel.isStreaming {
                         TypingIndicator()
                             .id("typing-indicator")
                     }
 
-                    // Streaming message bubble when streaming or can retry
-                    if viewModel.isStreaming || viewModel.canRetry {
-                        StreamingMessageBubble(
-                            content: viewModel.streamingContent,
-                            isStreaming: viewModel.isStreaming,
-                            onRetry: viewModel.canRetry ? {
-                                Task {
-                                    await viewModel.retryLastMessage()
-                                }
-                            } : nil
-                        )
-                        .id("streaming-bubble")
-                    }
-
                     // Invisible anchor for scrolling
                     Color.clear
-                        .frame(height: 1)
+                        .frame(height: 24)
                         .id("bottom")
                 }
                 .padding(.top, 8)
+                .padding(.bottom, 8)
             }
             .refreshable {
                 // Pull-to-refresh for syncing (Task 1.5)
@@ -426,6 +494,13 @@ struct ChatView: View {
                 // Auto-scroll as content streams in
                 scrollToBottom(proxy: proxy)
             }
+            .onReceive(NotificationCenter.default.publisher(
+                for: UIResponder.keyboardWillChangeFrameNotification
+            )) { _ in
+                DispatchQueue.main.async {
+                    scrollToBottom(proxy: proxy)
+                }
+            }
         }
     }
 
@@ -441,6 +516,84 @@ struct ChatView: View {
         }
     }
 
+    /// Inline suggestion chip for context setup.
+    /// This appears before showing the full sheet so the user opts in.
+    private var contextSuggestionChip: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "heart.text.clipboard.fill")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(Color.terracotta)
+                .frame(width: 28, height: 28)
+                .background(
+                    Circle()
+                        .fill(Color.terracotta.opacity(0.14))
+                )
+                .accessibilityHidden(true)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Help me personalize coaching")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Color.adaptiveText(colorScheme))
+                    .lineLimit(1)
+
+                Text("Add what matters to you")
+                    .font(.caption)
+                    .foregroundStyle(Color.adaptiveText(colorScheme, isPrimary: false))
+                    .lineLimit(1)
+            }
+
+            Spacer(minLength: 8)
+
+            Button("Add") {
+                contextPromptViewModel.openPromptFromSuggestion()
+            }
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(Color.terracotta)
+            .padding(.horizontal, 12)
+            .frame(height: 32)
+            .background(
+                Capsule()
+                    .fill(Color.terracotta.opacity(0.13))
+            )
+            .accessibilityHint("Opens a short setup to personalize your coaching")
+
+            Button {
+                contextPromptViewModel.dismissSuggestionChip()
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(Color.adaptiveText(colorScheme, isPrimary: false))
+                    .frame(width: 28, height: 28)
+                    .background(
+                        Circle()
+                            .fill(
+                                colorScheme == .dark
+                                    ? Color.warmGray700.opacity(0.8)
+                                    : Color.warmGray100.opacity(0.9)
+                            )
+                    )
+            }
+            .accessibilityLabel("Dismiss suggestion")
+            .accessibilityHint("Hides this reminder for now")
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .modifier(SuggestionChipSurfaceModifier())
+        .overlay(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .stroke(
+                    colorScheme == .dark
+                        ? Color.white.opacity(0.16)
+                        : Color.white.opacity(0.22),
+                    lineWidth: 1
+                )
+        )
+        .padding(.horizontal, 12)
+        .padding(.bottom, 8)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Personalization suggestion")
+    }
+
     // MARK: - Toast
 
     /// Toast shown when history button is tapped
@@ -448,10 +601,14 @@ struct ChatView: View {
         VStack {
             Text("Conversation history coming soon!")
                 .font(.subheadline.weight(.medium))
-                .foregroundColor(Color.warmGray900)
+                .foregroundColor(Color.adaptiveText(colorScheme))
                 .padding(.horizontal, 20)
                 .padding(.vertical, 12)
-                .background(Color.warmGray100)
+                .background(
+                    colorScheme == .dark
+                        ? Color.warmGray700.opacity(0.8)
+                        : Color.warmGray100
+                )
                 .clipShape(Capsule())
                 .shadow(color: .black.opacity(0.1), radius: 8, y: 4)
                 .padding(.top, 60)
@@ -495,10 +652,82 @@ struct ChatView: View {
         showContextProfile = true
     }
 
+    /// Hides composer whenever popups/sheets are active so it never overlays modal UI.
+    private var shouldShowComposer: Bool {
+        !contextPromptViewModel.showPrompt &&
+        !voiceViewModel.showPermissionSheet &&
+        !contextPromptViewModel.showSetupForm &&
+        !insightSuggestionsViewModel.showSuggestions &&
+        !showContextProfile &&
+        !showSettings
+    }
+
+    /// Dismisses keyboard from anywhere in the view hierarchy.
+    private func dismissKeyboard() {
+        UIApplication.shared.sendAction(
+            #selector(UIResponder.resignFirstResponder),
+            to: nil,
+            from: nil,
+            for: nil
+        )
+
+        UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .flatMap(\.windows)
+            .forEach { $0.endEditing(true) }
+
+        DispatchQueue.main.async {
+            UIApplication.shared.sendAction(
+                #selector(UIResponder.resignFirstResponder),
+                to: nil,
+                from: nil,
+                for: nil
+            )
+            UIApplication.shared.connectedScenes
+                .compactMap { $0 as? UIWindowScene }
+                .flatMap(\.windows)
+                .forEach { $0.endEditing(true) }
+        }
+    }
+
     /// Scrolls to the bottom of the message list
     private func scrollToBottom(proxy: ScrollViewProxy) {
         withAnimation(.easeOut(duration: 0.2)) {
             proxy.scrollTo("bottom", anchor: .bottom)
+        }
+    }
+}
+
+private struct SuggestionChipSurfaceModifier: ViewModifier {
+    @Environment(\.colorScheme) private var colorScheme
+
+    func body(content: Content) -> some View {
+        let shape = RoundedRectangle(cornerRadius: 20, style: .continuous)
+
+        if #available(iOS 26, *) {
+            content
+                .background {
+                    shape
+                        .fill(.clear)
+                        .glassEffect(.regular, in: shape)
+                    shape
+                        .fill(
+                            colorScheme == .dark
+                                ? Color.black.opacity(0.26)
+                                : Color.white.opacity(0.2)
+                        )
+                }
+                .clipShape(shape)
+        } else {
+            content
+                .background(
+                    shape.fill(
+                        colorScheme == .dark
+                            ? Color.warmGray800.opacity(0.88)
+                            : Color.warmGray50.opacity(0.95)
+                    )
+                )
+                .clipShape(shape)
         }
     }
 }

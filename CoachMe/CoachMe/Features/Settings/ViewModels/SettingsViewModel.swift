@@ -19,6 +19,9 @@ final class SettingsViewModel {
     /// Whether to show the delete all confirmation alert
     var showDeleteAllConfirmation = false
 
+    /// Whether to show the sign out confirmation alert
+    var showSignOutConfirmation = false
+
     /// Whether a bulk deletion is in progress
     var isDeleting = false
 
@@ -33,11 +36,14 @@ final class SettingsViewModel {
     /// Errors specific to settings operations
     enum SettingsError: LocalizedError, Equatable {
         case deleteFailed(String)
+        case signOutFailed(String)
 
         var errorDescription: String? {
             switch self {
             case .deleteFailed(let reason):
                 return "I couldn't clear your conversations. \(reason)"
+            case .signOutFailed(let reason):
+                return "I couldn't sign you out. \(reason)"
             }
         }
     }
@@ -76,6 +82,30 @@ final class SettingsViewModel {
         } catch {
             self.error = .deleteFailed(error.localizedDescription)
             showError = true
+            return false
+        }
+    }
+
+    /// Signs the user out
+    /// - Returns: true if sign out succeeded, false otherwise
+    @discardableResult
+    func signOut() async -> Bool {
+        do {
+            try await AuthService.shared.signOut()
+
+            #if DEBUG
+            print("SettingsViewModel: User signed out")
+            #endif
+
+            return true
+        } catch {
+            self.error = .signOutFailed(error.localizedDescription)
+            showError = true
+
+            #if DEBUG
+            print("SettingsViewModel: Sign out error: \(error)")
+            #endif
+
             return false
         }
     }

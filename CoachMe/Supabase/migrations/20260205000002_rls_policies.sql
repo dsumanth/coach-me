@@ -49,7 +49,8 @@ CREATE POLICY "Users can create own conversations"
 -- UPDATE: Users can update their own conversations
 CREATE POLICY "Users can update own conversations"
     ON public.conversations FOR UPDATE
-    USING (auth.uid() = user_id);
+    USING (auth.uid() = user_id)
+    WITH CHECK (auth.uid() = user_id);
 
 -- DELETE: Users can delete their own conversations
 CREATE POLICY "Users can delete own conversations"
@@ -74,7 +75,8 @@ CREATE POLICY "Users can create own messages"
 -- UPDATE: Users can update their own messages
 CREATE POLICY "Users can update own messages"
     ON public.messages FOR UPDATE
-    USING (auth.uid() = user_id);
+    USING (auth.uid() = user_id)
+    WITH CHECK (auth.uid() = user_id);
 
 -- DELETE: Users can delete their own messages
 CREATE POLICY "Users can delete own messages"

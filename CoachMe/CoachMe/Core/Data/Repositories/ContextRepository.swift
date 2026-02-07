@@ -15,6 +15,7 @@ import SwiftData
 enum ContextError: LocalizedError, Equatable {
     case notFound
     case notAuthenticated
+    case fetchFailed(String)
     case saveFailed(String)
     case cacheError(String)
     case encodingError(String)
@@ -25,6 +26,8 @@ enum ContextError: LocalizedError, Equatable {
             return "I don't have your context yet. Let's set that up."
         case .notAuthenticated:
             return "I need you to sign in first."
+        case .fetchFailed(let reason):
+            return "I couldn't load your context. \(reason)"
         case .saveFailed(let reason):
             return "I couldn't save your context. \(reason)"
         case .cacheError(let reason):
@@ -39,6 +42,8 @@ enum ContextError: LocalizedError, Equatable {
         switch (lhs, rhs) {
         case (.notFound, .notFound), (.notAuthenticated, .notAuthenticated):
             return true
+        case (.fetchFailed(let a), .fetchFailed(let b)):
+            return a == b
         case (.saveFailed(let a), .saveFailed(let b)):
             return a == b
         case (.cacheError(let a), .cacheError(let b)):
@@ -395,12 +400,6 @@ final class ContextRepository: ContextRepositoryProtocol {
                     let contextValue = ContextValue.userValue(valueContent)
                     profile.addValue(contextValue)
                 }
-
-                // If no commas, treat as single value
-                if valueItems.isEmpty {
-                    let contextValue = ContextValue.userValue(trimmedValues)
-                    profile.addValue(contextValue)
-                }
             }
 
             // Parse goals into ContextGoal objects
@@ -413,12 +412,6 @@ final class ContextRepository: ContextRepositoryProtocol {
 
                 for goalContent in goalItems {
                     let contextGoal = ContextGoal.userGoal(goalContent)
-                    profile.addGoal(contextGoal)
-                }
-
-                // If no commas, treat as single goal
-                if goalItems.isEmpty {
-                    let contextGoal = ContextGoal.userGoal(trimmedGoals)
                     profile.addGoal(contextGoal)
                 }
             }

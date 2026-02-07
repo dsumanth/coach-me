@@ -40,11 +40,9 @@ struct ContextSituation: Codable, Sendable, Equatable {
 
     /// Check if any situation content is set
     var hasContent: Bool {
-        lifeStage != nil ||
-        occupation != nil ||
-        relationships != nil ||
-        challenges != nil ||
-        freeform != nil
+        [lifeStage, occupation, relationships, challenges, freeform]
+            .compactMap { $0 }
+            .contains { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
     }
 
     /// Count of filled fields

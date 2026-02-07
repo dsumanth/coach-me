@@ -10,6 +10,8 @@ import SwiftUI
 /// Permission explanation sheet for voice input
 /// Per UX spec: Warm permission explanation before system dialog
 struct VoiceInputPermissionSheet: View {
+    @Environment(\.colorScheme) private var colorScheme
+
     /// Callback when user taps enable
     var onEnable: () -> Void
 
@@ -29,12 +31,12 @@ struct VoiceInputPermissionSheet: View {
             Text("Voice Input")
                 .font(.title2)
                 .fontWeight(.semibold)
-                .foregroundStyle(Color.warmGray800)
+                .foregroundStyle(Color.adaptiveText(colorScheme))
 
             // Description - warm first-person voice
             Text("I'd love to hear your voice. Enable the microphone so you can speak your thoughts instead of typing.")
                 .font(.body)
-                .foregroundStyle(Color.warmGray600)
+                .foregroundStyle(Color.adaptiveText(colorScheme, isPrimary: false))
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 24)
 
@@ -57,7 +59,7 @@ struct VoiceInputPermissionSheet: View {
                 Button(action: onDismiss) {
                     Text("Not Now")
                         .font(.body)
-                        .foregroundStyle(Color.warmGray600)
+                        .foregroundStyle(Color.adaptiveText(colorScheme, isPrimary: false))
                 }
                 .accessibilityLabel("Dismiss")
                 .accessibilityHint("Continue without voice input")
@@ -65,7 +67,7 @@ struct VoiceInputPermissionSheet: View {
             .padding(.horizontal, 24)
         }
         .padding(.vertical, 32)
-        .background(Color.cream)
+        .adaptiveGlassSheet()
     }
 }
 

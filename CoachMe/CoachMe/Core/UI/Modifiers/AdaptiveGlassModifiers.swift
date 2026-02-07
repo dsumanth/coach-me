@@ -19,7 +19,17 @@ extension View {
     @ViewBuilder
     func adaptiveGlass() -> some View {
         if #available(iOS 26, *) {
-            self.glassEffect()
+            let shape = RoundedRectangle(cornerRadius: DesignConstants.CornerRadius.standard, style: .continuous)
+            self
+                .background {
+                    shape
+                        .fill(.clear)
+                        .glassEffect(.regular, in: shape)
+                    shape
+                        .fill(Color.white.opacity(0.025))
+                }
+                .overlay(shape.stroke(Color.white.opacity(0.18), lineWidth: 1))
+                .clipShape(shape)
         } else {
             self.background(.ultraThinMaterial)
                 .clipShape(RoundedRectangle(cornerRadius: DesignConstants.CornerRadius.standard))
@@ -32,9 +42,17 @@ extension View {
     @ViewBuilder
     func adaptiveInteractiveGlass() -> some View {
         if #available(iOS 26, *) {
-            // iOS 26 glass effect handles interactive states via GlassEffectContainer
-            // Individual interactive elements inherit from container context
-            self.glassEffect()
+            let shape = RoundedRectangle(cornerRadius: DesignConstants.CornerRadius.interactive, style: .continuous)
+            self
+                .background {
+                    shape
+                        .fill(.clear)
+                        .glassEffect(.regular, in: shape)
+                    shape
+                        .fill(Color.white.opacity(0.03))
+                }
+                .overlay(shape.stroke(Color.white.opacity(0.2), lineWidth: 1))
+                .clipShape(shape)
         } else {
             self.background(.regularMaterial)
                 .clipShape(RoundedRectangle(cornerRadius: DesignConstants.CornerRadius.interactive))
@@ -47,7 +65,17 @@ extension View {
     @ViewBuilder
     func adaptiveGlassContainer() -> some View {
         if #available(iOS 26, *) {
-            self.glassEffect()
+            let shape = RoundedRectangle(cornerRadius: DesignConstants.CornerRadius.container, style: .continuous)
+            self
+                .background {
+                    shape
+                        .fill(.clear)
+                        .glassEffect(.regular, in: shape)
+                    shape
+                        .fill(Color.white.opacity(0.02))
+                }
+                .overlay(shape.stroke(Color.white.opacity(0.16), lineWidth: 1))
+                .clipShape(shape)
         } else {
             self.background(.thinMaterial)
                 .clipShape(RoundedRectangle(cornerRadius: DesignConstants.CornerRadius.container))
@@ -62,7 +90,7 @@ extension View {
     @ViewBuilder
     func adaptiveGlassNavigation() -> some View {
         if #available(iOS 26, *) {
-            self.glassEffect()
+            self.background(.ultraThinMaterial)
         } else {
             self.background(.ultraThinMaterial)
         }
@@ -73,14 +101,7 @@ extension View {
     /// - iOS 18-25: Uses thickMaterial for better readability on sheets
     @ViewBuilder
     func adaptiveGlassSheet() -> some View {
-        if #available(iOS 26, *) {
-            // .glassEffect() creates a squircle shape inside the sheet — use material instead.
-            // The sheet presentation handles its own corner radius on iOS 26.
-            self.background(.thickMaterial)
-        } else {
-            self.background(.thickMaterial)
-                .clipShape(RoundedRectangle(cornerRadius: DesignConstants.CornerRadius.sheet))
-        }
+        self.modifier(AdaptiveGlassSheetSurfaceModifier())
     }
 
     /// Applies adaptive glass effect for text input containers.
@@ -89,7 +110,17 @@ extension View {
     @ViewBuilder
     func adaptiveGlassInput() -> some View {
         if #available(iOS 26, *) {
-            self.glassEffect()
+            let shape = RoundedRectangle(cornerRadius: DesignConstants.CornerRadius.input, style: .continuous)
+            self
+                .background {
+                    shape
+                        .fill(.clear)
+                        .glassEffect(.regular, in: shape)
+                    shape
+                        .fill(Color.white.opacity(0.03))
+                }
+                .overlay(shape.stroke(Color.white.opacity(0.22), lineWidth: 1))
+                .clipShape(shape)
         } else {
             self.background(.regularMaterial)
                 .clipShape(RoundedRectangle(cornerRadius: DesignConstants.CornerRadius.input))
@@ -99,3 +130,55 @@ extension View {
 }
 
 // Note: DesignConstants moved to DesignConstants.swift
+
+private struct AdaptiveGlassSheetSurfaceModifier: ViewModifier {
+    @Environment(\.colorScheme) private var colorScheme
+
+    func body(content: Content) -> some View {
+        let shape = RoundedRectangle(cornerRadius: DesignConstants.CornerRadius.sheet, style: .continuous)
+
+        if #available(iOS 26, *) {
+            content
+                .background {
+                    shape
+                        .fill(.clear)
+                        .glassEffect(.regular, in: shape)
+                    shape
+                        .fill(
+                            colorScheme == .dark
+                                ? Color.black.opacity(0.34)
+                                : Color.white.opacity(0.78)
+                        )
+                }
+                .overlay(
+                    shape
+                        .stroke(
+                            colorScheme == .dark
+                                ? Color.white.opacity(0.18)
+                                : Color.white.opacity(0.45),
+                            lineWidth: 1
+                        )
+                )
+                .clipShape(shape)
+        } else {
+            content
+                .background(
+                    shape.fill(
+                        colorScheme == .dark
+                            ? Color.warmGray800.opacity(0.92)
+                            : Color.warmGray50.opacity(0.96)
+                    )
+                )
+                .overlay(
+                    shape
+                        .stroke(
+                            colorScheme == .dark
+                                ? Color.white.opacity(0.14)
+                                : Color.black.opacity(0.08),
+                            lineWidth: 1
+                        )
+                )
+                .clipShape(shape)
+        }
+    }
+}

@@ -16,6 +16,7 @@ final class ContextPromptViewModelTests: XCTestCase {
     private var modelContainer: ModelContainer!
     private var modelContext: ModelContext!
     private var mockRepository: MockContextRepository!
+    private var mockCooldownStorage: MockCooldownStorage!
     private var viewModel: ContextPromptViewModel!
 
     override func setUp() async throws {
@@ -30,11 +31,16 @@ final class ContextPromptViewModelTests: XCTestCase {
         modelContext = modelContainer.mainContext
 
         mockRepository = MockContextRepository()
-        viewModel = ContextPromptViewModel(contextRepository: mockRepository)
+        mockCooldownStorage = MockCooldownStorage()
+        viewModel = ContextPromptViewModel(
+            contextRepository: mockRepository,
+            cooldownStorage: mockCooldownStorage
+        )
     }
 
     override func tearDown() async throws {
         viewModel = nil
+        mockCooldownStorage = nil
         mockRepository = nil
         modelContainer = nil
         modelContext = nil
@@ -67,8 +73,8 @@ final class ContextPromptViewModelTests: XCTestCase {
         viewModel.onAIResponseReceived() // First exchange
         viewModel.onAIResponseReceived() // Second message (triggers check)
 
-        // Then: Prompt should be shown
-        XCTAssertTrue(viewModel.showPrompt, "Prompt should be shown when firstSessionComplete is false")
+        // Then: Suggestion chip should be shown (onAIResponseReceived triggers the chip, not the prompt sheet)
+        XCTAssertTrue(viewModel.showSuggestionChip, "Suggestion chip should be shown when firstSessionComplete is false")
     }
 
     func testPromptShownWhenNoProfileExists() async {
@@ -81,8 +87,8 @@ final class ContextPromptViewModelTests: XCTestCase {
         viewModel.onAIResponseReceived()
         viewModel.onAIResponseReceived()
 
-        // Then: Prompt should be shown
-        XCTAssertTrue(viewModel.showPrompt, "Prompt should be shown when no profile exists")
+        // Then: Suggestion chip should be shown
+        XCTAssertTrue(viewModel.showSuggestionChip, "Suggestion chip should be shown when no profile exists")
     }
 
     // MARK: - Test: Prompt NOT shown when hasContext == true (AC #2)
@@ -113,8 +119,8 @@ final class ContextPromptViewModelTests: XCTestCase {
         viewModel.onAIResponseReceived()
         viewModel.onAIResponseReceived()
 
-        // Then: Prompt should NOT be shown
-        XCTAssertFalse(viewModel.showPrompt, "Prompt should NOT be shown when user already has context")
+        // Then: Suggestion chip should NOT be shown
+        XCTAssertFalse(viewModel.showSuggestionChip, "Suggestion chip should NOT be shown when user already has context")
     }
 
     func testPromptNotShownWhenFirstSessionCompleteAndHasContext() async {
@@ -142,8 +148,8 @@ final class ContextPromptViewModelTests: XCTestCase {
         viewModel.onAIResponseReceived()
         viewModel.onAIResponseReceived()
 
-        // Then: Prompt should NOT be shown
-        XCTAssertFalse(viewModel.showPrompt, "Prompt should NOT be shown when user has goals")
+        // Then: Suggestion chip should NOT be shown
+        XCTAssertFalse(viewModel.showSuggestionChip, "Suggestion chip should NOT be shown when user has goals")
     }
 
     // MARK: - Test: Accept Prompt Flow (AC #3)
@@ -304,8 +310,8 @@ final class ContextPromptViewModelTests: XCTestCase {
             viewModel.onAIResponseReceived()
         }
 
-        // Then: Prompt should be shown again
-        XCTAssertTrue(viewModel.showPrompt, "Prompt should be shown again after session 3 when previously dismissed")
+        // Then: Suggestion chip should be shown again
+        XCTAssertTrue(viewModel.showSuggestionChip, "Suggestion chip should be shown again after session 3 when previously dismissed")
     }
 
     func testNoRePromptBeforeSession3() async {
@@ -335,8 +341,8 @@ final class ContextPromptViewModelTests: XCTestCase {
             viewModel.onAIResponseReceived()
         }
 
-        // Then: Prompt should NOT be shown yet
-        XCTAssertFalse(viewModel.showPrompt, "Prompt should NOT be shown before session 3")
+        // Then: Suggestion chip should NOT be shown yet
+        XCTAssertFalse(viewModel.showSuggestionChip, "Suggestion chip should NOT be shown before session 3")
     }
 
     // MARK: - Test: Skip Setup
@@ -386,11 +392,11 @@ final class ContextPromptViewModelTests: XCTestCase {
         // When: Resetting session count
         viewModel.resetSessionCount()
 
-        // Then: Message count should be reset (prompt won't show on first message)
+        // Then: Message count should be reset (chip won't show on first message)
         // We can't directly access sessionMessageCount, but we can verify behavior
-        // by checking that prompt doesn't show after just one more message
+        // by checking that suggestion chip doesn't show after just one more message
         viewModel.onAIResponseReceived()
-        XCTAssertFalse(viewModel.showPrompt, "After reset, prompt should not show on first message")
+        XCTAssertFalse(viewModel.showSuggestionChip, "After reset, suggestion chip should not show on first message")
     }
 
     // MARK: - Test: Error Handling
@@ -427,6 +433,111 @@ final class ContextPromptViewModelTests: XCTestCase {
         // Then: Error should be cleared
         XCTAssertFalse(viewModel.showError, "showError should be false")
         XCTAssertNil(viewModel.error, "error should be nil")
+    }
+
+    // MARK: - Test: Prompt Cooldown
+
+    func testCooldownSuppressesRePrompt() async {
+        // Given: A dismissed profile with firstSessionComplete (cooldown applies)
+        let userId = UUID()
+        let profile = ContextProfile(
+            id: UUID(),
+            userId: userId,
+            values: [],
+            goals: [],
+            situation: .empty,
+            extractedInsights: [],
+            contextVersion: 1,
+            firstSessionComplete: true,
+            promptDismissedCount: 1,
+            createdAt: Date(),
+            updatedAt: Date()
+        )
+        mockRepository.mockProfile = profile
+
+        // Simulate that the prompt was shown recently (within 7-day cooldown)
+        let key = "context_prompt.last_shown_at.\(userId.uuidString)"
+        mockCooldownStorage.setDate(Date(), forKey: key)
+
+        await viewModel.configure(userId: userId)
+
+        // Simulate 3 complete exchanges (enough for re-prompt threshold)
+        for _ in 0..<6 {
+            viewModel.onAIResponseReceived()
+        }
+
+        // Then: Suggestion chip should NOT appear because cooldown is active
+        XCTAssertFalse(viewModel.showSuggestionChip, "Cooldown should suppress the re-prompt")
+    }
+
+    func testExpiredCooldownAllowsRePrompt() async {
+        // Given: A dismissed profile with firstSessionComplete
+        let userId = UUID()
+        let profile = ContextProfile(
+            id: UUID(),
+            userId: userId,
+            values: [],
+            goals: [],
+            situation: .empty,
+            extractedInsights: [],
+            contextVersion: 1,
+            firstSessionComplete: true,
+            promptDismissedCount: 1,
+            createdAt: Date(),
+            updatedAt: Date()
+        )
+        mockRepository.mockProfile = profile
+
+        // Simulate that the prompt was shown 8 days ago (beyond 7-day cooldown)
+        let key = "context_prompt.last_shown_at.\(userId.uuidString)"
+        let eightDaysAgo = Date().addingTimeInterval(-8 * 24 * 60 * 60)
+        mockCooldownStorage.setDate(eightDaysAgo, forKey: key)
+
+        await viewModel.configure(userId: userId)
+
+        // Simulate 3 complete exchanges
+        for _ in 0..<6 {
+            viewModel.onAIResponseReceived()
+        }
+
+        // Then: Suggestion chip SHOULD appear because cooldown has expired
+        XCTAssertTrue(viewModel.showSuggestionChip, "Expired cooldown should allow re-prompt")
+    }
+
+    func testFirstTimePromptIgnoresCooldown() async {
+        // Given: No profile (first-time user) but a stale cooldown date exists
+        let userId = UUID()
+        mockRepository.mockProfile = nil
+
+        let key = "context_prompt.last_shown_at.\(userId.uuidString)"
+        mockCooldownStorage.setDate(Date(), forKey: key)
+
+        await viewModel.configure(userId: userId)
+        viewModel.onAIResponseReceived()
+        viewModel.onAIResponseReceived()
+
+        // Then: Suggestion chip should appear — first-time prompts bypass cooldown
+        XCTAssertTrue(viewModel.showSuggestionChip, "First-time prompt should not be blocked by cooldown")
+    }
+
+    func testOpenPromptFromSuggestionRecordsCooldownDate() async {
+        // Given: A configured view model with suggestion chip showing
+        let userId = UUID()
+        mockRepository.mockProfile = nil
+
+        await viewModel.configure(userId: userId)
+        viewModel.onAIResponseReceived()
+        viewModel.onAIResponseReceived()
+
+        // Precondition: chip is showing
+        XCTAssertTrue(viewModel.showSuggestionChip)
+
+        // When: User taps the suggestion chip
+        viewModel.openPromptFromSuggestion()
+
+        // Then: Cooldown date should be recorded
+        let key = "context_prompt.last_shown_at.\(userId.uuidString)"
+        XCTAssertNotNil(mockCooldownStorage.date(forKey: key), "Opening prompt should record cooldown date")
     }
 }
 
@@ -499,4 +610,18 @@ final class MockContextRepository: ContextRepositoryProtocol {
     func getPendingInsights(userId: UUID) async throws -> [ExtractedInsight] { return [] }
     func confirmInsight(userId: UUID, insightId: UUID) async throws {}
     func dismissInsight(userId: UUID, insightId: UUID) async throws {}
+}
+
+// MARK: - Mock Cooldown Storage
+
+final class MockCooldownStorage: CooldownStorage, @unchecked Sendable {
+    private var storage: [String: Date] = [:]
+
+    func date(forKey key: String) -> Date? {
+        storage[key]
+    }
+
+    func setDate(_ date: Date, forKey key: String) {
+        storage[key] = date
+    }
 }

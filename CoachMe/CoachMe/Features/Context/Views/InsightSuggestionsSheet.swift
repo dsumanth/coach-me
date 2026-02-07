@@ -12,6 +12,8 @@ import SwiftUI
 /// Sheet displaying all pending insight suggestions
 /// Users can confirm or dismiss each suggestion individually
 struct InsightSuggestionsSheet: View {
+    @Environment(\.colorScheme) private var colorScheme
+
     // MARK: - Properties
 
     /// Pending insights to display
@@ -66,13 +68,13 @@ struct InsightSuggestionsSheet: View {
             Text("I learned something about you")
                 .font(.title2)
                 .fontWeight(.semibold)
-                .foregroundStyle(Color.warmGray900)
+                .foregroundStyle(Color.adaptiveText(colorScheme))
                 .multilineTextAlignment(.center)
                 .accessibilityAddTraits(.isHeader)
 
             Text("Would you like me to remember these things?")
                 .font(.body)
-                .foregroundStyle(Color.warmGray600)
+                .foregroundStyle(Color.adaptiveText(colorScheme, isPrimary: false))
                 .multilineTextAlignment(.center)
         }
         .padding(.top, DesignConstants.Spacing.sm)
@@ -89,11 +91,11 @@ struct InsightSuggestionsSheet: View {
 
             Text("All caught up!")
                 .font(.headline)
-                .foregroundStyle(Color.warmGray700)
+                .foregroundStyle(Color.adaptiveText(colorScheme))
 
             Text("I don't have any new suggestions right now.")
                 .font(.body)
-                .foregroundStyle(Color.warmGray500)
+                .foregroundStyle(Color.adaptiveText(colorScheme, isPrimary: false))
                 .multilineTextAlignment(.center)
         }
         .padding(.vertical, DesignConstants.Spacing.xl)
@@ -123,7 +125,7 @@ struct InsightSuggestionsSheet: View {
         } label: {
             Text("Review later")
                 .font(.subheadline)
-                .foregroundStyle(Color.warmGray500)
+                .foregroundStyle(Color.adaptiveText(colorScheme, isPrimary: false))
         }
         .padding(.top, DesignConstants.Spacing.sm)
         .padding(.bottom, DesignConstants.Spacing.md)

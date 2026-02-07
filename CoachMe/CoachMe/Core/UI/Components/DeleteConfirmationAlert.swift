@@ -71,7 +71,6 @@ struct SingleConversationDeleteAlert: ViewModifier {
                     onDelete()
                 }
             }
-            .accessibilityElement(children: .combine)
     }
 }
 
@@ -95,7 +94,6 @@ struct AllConversationsDeleteAlert: ViewModifier {
                     onDelete()
                 }
             }
-            .accessibilityElement(children: .combine)
     }
 }
 

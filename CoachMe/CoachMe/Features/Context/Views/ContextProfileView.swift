@@ -257,8 +257,7 @@ struct ContextProfileView: View {
         }
         .padding(.vertical, DesignConstants.Spacing.sm)
         .padding(.horizontal, DesignConstants.Spacing.md)
-        .background(Color.adaptiveSurface(colorScheme))
-        .clipShape(RoundedRectangle(cornerRadius: DesignConstants.CornerRadius.standard))
+        .modifier(ContextProfileRowSurfaceModifier(colorScheme: colorScheme))
     }
 
     // MARK: - Situation Section
@@ -417,6 +416,33 @@ struct ContextProfileView: View {
             await viewModel.updateGoal(id: id, newContent: newContent)
         case .situation:
             await viewModel.updateSituation(newContent: newContent)
+        }
+    }
+}
+
+private struct ContextProfileRowSurfaceModifier: ViewModifier {
+    let colorScheme: ColorScheme
+
+    func body(content: Content) -> some View {
+        let shape = RoundedRectangle(cornerRadius: DesignConstants.CornerRadius.standard, style: .continuous)
+        if #available(iOS 26, *) {
+            content
+                .background {
+                    shape
+                        .fill(.clear)
+                        .glassEffect(.regular, in: shape)
+                    shape
+                        .fill(Color.white.opacity(colorScheme == .dark ? 0.018 : 0.028))
+                }
+                .overlay(
+                    shape
+                        .stroke(Color.white.opacity(colorScheme == .dark ? 0.18 : 0.24), lineWidth: 1)
+                )
+                .clipShape(shape)
+        } else {
+            content
+                .background(Color.adaptiveSurface(colorScheme))
+                .clipShape(shape)
         }
     }
 }

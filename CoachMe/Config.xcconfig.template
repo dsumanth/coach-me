@@ -1,0 +1,19 @@
+// Config.xcconfig.template
+// CoachMe - Configuration Template
+//
+// Copy this file as Debug.xcconfig and/or Release.xcconfig, then fill in your values.
+// NEVER commit Debug.xcconfig or Release.xcconfig to source control.
+//
+// Setup:
+// 1. cp Config.xcconfig.template Debug.xcconfig
+// 2. cp Config.xcconfig.template Release.xcconfig
+// 3. Fill in the values below for each environment
+// 4. The project is already configured to use these files
+
+// Environment: development | staging | production
+COACH_ENVIRONMENT = development
+
+// Supabase Credentials
+// Note: Use $() to escape // in URLs (xcconfig treats // as comments)
+SUPABASE_URL = https:/$()/YOUR_PROJECT.supabase.co
+SUPABASE_PUBLISHABLE_KEY = sb_publishable_YOUR_KEY_HERE

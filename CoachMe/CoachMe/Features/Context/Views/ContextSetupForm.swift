@@ -12,6 +12,8 @@ import SwiftUI
 /// Form for users to input their initial context (values, goals, situation)
 /// Displayed after user accepts the context prompt
 struct ContextSetupForm: View {
+    @Environment(\.colorScheme) private var colorScheme
+
     // MARK: - State
 
     /// User's core values input
@@ -95,16 +97,20 @@ struct ContextSetupForm: View {
                 .foregroundStyle(.secondary)
 
             TextField(
-                "E.g., honesty, growth, family, creativity...",
+                "",
                 text: $valuesText,
+                prompt: Text("E.g., honesty, growth, family, creativity...")
+                    .foregroundStyle(fieldPlaceholderColor),
                 axis: .vertical
             )
             .textFieldStyle(.plain)
-            .lineLimit(2...4)
-            .padding(DesignConstants.Spacing.sm)
-            .background(Color.warmGray50)
-            .clipShape(RoundedRectangle(cornerRadius: DesignConstants.CornerRadius.input))
+            .foregroundColor(fieldTextColor)
+            .lineLimit(1...4)
+            .padding(.horizontal, DesignConstants.Spacing.sm)
+            .padding(.vertical, 10)
+            .modifier(GlassInputBackground())
             .focused($focusedField, equals: .values)
+            .tint(.accentColor)
             .accessibilityLabel("Your values")
             .accessibilityHint("Enter what's important to you, like honesty, growth, or family")
         }
@@ -117,16 +123,20 @@ struct ContextSetupForm: View {
                 .foregroundStyle(.secondary)
 
             TextField(
-                "E.g., career change, better relationships, more balance...",
+                "",
                 text: $goalsText,
+                prompt: Text("E.g., career change, better relationships, more balance...")
+                    .foregroundStyle(fieldPlaceholderColor),
                 axis: .vertical
             )
             .textFieldStyle(.plain)
-            .lineLimit(2...4)
-            .padding(DesignConstants.Spacing.sm)
-            .background(Color.warmGray50)
-            .clipShape(RoundedRectangle(cornerRadius: DesignConstants.CornerRadius.input))
+            .foregroundColor(fieldTextColor)
+            .lineLimit(1...4)
+            .padding(.horizontal, DesignConstants.Spacing.sm)
+            .padding(.vertical, 10)
+            .modifier(GlassInputBackground())
             .focused($focusedField, equals: .goals)
+            .tint(.accentColor)
             .accessibilityLabel("Your goals")
             .accessibilityHint("Enter what you're working toward, like career change or better relationships")
         }
@@ -139,16 +149,20 @@ struct ContextSetupForm: View {
                 .foregroundStyle(.secondary)
 
             TextField(
-                "E.g., I'm a parent of two, work in tech, recently moved cities...",
+                "",
                 text: $situationText,
+                prompt: Text("E.g., I'm a parent of two, work in tech, recently moved cities...")
+                    .foregroundStyle(fieldPlaceholderColor),
                 axis: .vertical
             )
             .textFieldStyle(.plain)
-            .lineLimit(2...4)
-            .padding(DesignConstants.Spacing.sm)
-            .background(Color.warmGray50)
-            .clipShape(RoundedRectangle(cornerRadius: DesignConstants.CornerRadius.input))
+            .foregroundColor(fieldTextColor)
+            .lineLimit(1...4)
+            .padding(.horizontal, DesignConstants.Spacing.sm)
+            .padding(.vertical, 10)
+            .modifier(GlassInputBackground())
             .focused($focusedField, equals: .situation)
+            .tint(.accentColor)
             .accessibilityLabel("Your situation")
             .accessibilityHint("Optionally share context about your life situation")
         }
@@ -161,19 +175,24 @@ struct ContextSetupForm: View {
             // Save button - enabled if any field has content
             Button {
                 focusedField = nil
-                onSave(valuesText, goalsText, situationText)
+                onSave(
+                    valuesText.trimmingCharacters(in: .whitespacesAndNewlines),
+                    goalsText.trimmingCharacters(in: .whitespacesAndNewlines),
+                    situationText.trimmingCharacters(in: .whitespacesAndNewlines)
+                )
             } label: {
                 Text("Save")
                     .font(.headline)
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
                     .frame(height: DesignConstants.Size.buttonLarge)
+                    .background(
+                        RoundedRectangle(cornerRadius: DesignConstants.CornerRadius.interactive, style: .continuous)
+                            .fill(hasAnyContent ? Color.terracotta : Color.terracotta.opacity(0.55))
+                    )
             }
-            .buttonStyle(.borderedProminent)
-            .tint(Color.terracotta)
             .disabled(!hasAnyContent)
             .opacity(hasAnyContent ? 1.0 : DesignConstants.Opacity.disabled)
-            .adaptiveInteractiveGlass()
             .accessibilityLabel("Save your context")
             .accessibilityHint(hasAnyContent ? "Saves your values, goals, and situation" : "Enter at least one field to save")
 
@@ -184,7 +203,7 @@ struct ContextSetupForm: View {
             } label: {
                 Text("Skip for now")
                     .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(colorScheme == .dark ? .white.opacity(0.88) : Color.warmGray700)
             }
             .accessibilityLabel("Skip for now")
             .accessibilityHint("Closes the form without saving. You can set this up later.")
@@ -199,6 +218,46 @@ struct ContextSetupForm: View {
         !valuesText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
         !goalsText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
         !situationText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private var fieldTextColor: Color {
+        colorScheme == .dark ? .white.opacity(0.95) : Color.warmGray900
+    }
+
+    private var fieldPlaceholderColor: Color {
+        colorScheme == .dark ? .white.opacity(0.48) : Color.warmGray500.opacity(0.9)
+    }
+}
+
+private struct GlassInputBackground: ViewModifier {
+    @Environment(\.colorScheme) private var colorScheme
+
+    func body(content: Content) -> some View {
+        let shape = RoundedRectangle(cornerRadius: DesignConstants.CornerRadius.input, style: .continuous)
+
+        if #available(iOS 26, *) {
+            content
+                .background {
+                    shape
+                        .fill(.clear)
+                        .glassEffect(.regular, in: shape)
+                    shape
+                        .fill(Color.white.opacity(colorScheme == .dark ? 0.02 : 0.03))
+                }
+                .overlay(
+                    shape
+                        .stroke(Color.white.opacity(colorScheme == .dark ? 0.2 : 0.26), lineWidth: 1)
+                )
+                .clipShape(shape)
+        } else {
+            content
+                .background(.regularMaterial, in: shape)
+                .overlay(
+                    shape
+                        .stroke(Color.white.opacity(colorScheme == .dark ? 0.18 : 0.24), lineWidth: 1)
+                )
+                .clipShape(shape)
+        }
     }
 }
 

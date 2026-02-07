@@ -90,7 +90,7 @@ final class ContextViewModel {
                 showError = true
             }
         } catch {
-            self.error = .saveFailed(error.localizedDescription)
+            self.error = .fetchFailed(error.localizedDescription)
             showError = true
         }
 

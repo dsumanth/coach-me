@@ -20,10 +20,11 @@ BEGIN
         NEW.email,
         COALESCE(NEW.raw_user_meta_data->>'full_name', NEW.email),
         NOW() + INTERVAL '7 days'
-    );
+    )
+    ON CONFLICT (id) DO NOTHING;
     RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_catalog;
 
 -- SECURITY DEFINER: This function runs with elevated privileges because
 -- it needs to insert into public.users on behalf of the new auth user.

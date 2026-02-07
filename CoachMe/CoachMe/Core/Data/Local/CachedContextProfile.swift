@@ -41,14 +41,19 @@ final class CachedContextProfile {
         return try? decoder.decode(ContextProfile.self, from: profileData)
     }
 
+    private static func makeEncoder() -> JSONEncoder {
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        return encoder
+    }
+
     /// Update cache with new profile data
     /// - Parameter profile: The ContextProfile to cache
     /// - Throws: Encoding error if profile can't be serialized
     /// Note: Must be called from MainActor context
     @MainActor
     func updateWith(_ profile: ContextProfile) throws {
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
+        let encoder = Self.makeEncoder()
         self.profileData = try encoder.encode(profile)
         self.lastSyncedAt = Date()
     }
@@ -60,8 +65,7 @@ final class CachedContextProfile {
     /// Note: Must be called from MainActor context
     @MainActor
     static func from(_ profile: ContextProfile) throws -> CachedContextProfile {
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
+        let encoder = makeEncoder()
         let data = try encoder.encode(profile)
         return CachedContextProfile(
             userId: profile.userId,
@@ -72,10 +76,13 @@ final class CachedContextProfile {
 
     // MARK: - Computed Properties
 
-    /// Check if cache is stale (older than 1 hour)
+    /// Cache staleness threshold (1 hour)
+    private static let staleThresholdSeconds: TimeInterval = 3600
+
+    /// Check if cache is stale (older than threshold)
     var isStale: Bool {
-        let oneHourAgo = Date().addingTimeInterval(-3600)
-        return lastSyncedAt < oneHourAgo
+        let threshold = Date().addingTimeInterval(-Self.staleThresholdSeconds)
+        return lastSyncedAt < threshold
     }
 
     /// Time since last sync for display

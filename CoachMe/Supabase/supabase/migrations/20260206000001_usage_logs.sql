@@ -11,9 +11,9 @@
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS public.usage_logs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
     conversation_id UUID NOT NULL REFERENCES public.conversations(id) ON DELETE CASCADE,
-    message_id UUID NOT NULL,
+    message_id UUID NOT NULL REFERENCES public.messages(id) ON DELETE CASCADE,
     model TEXT NOT NULL,
     tokens_in INTEGER NOT NULL DEFAULT 0,
     tokens_out INTEGER NOT NULL DEFAULT 0,

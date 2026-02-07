@@ -46,6 +46,22 @@ enum MemoryMomentParser {
     /// Captures the content inside the tags
     private static let memoryPattern = /\[MEMORY:\s*(.+?)\s*\]/
 
+    // MARK: - Parse Cache
+
+    /// NSCache-backed memoization for parse results.
+    /// Avoids re-parsing the same content on repeated SwiftUI body evaluations.
+    private static let parseCache: NSCache<NSString, ParseResultBox> = {
+        let cache = NSCache<NSString, ParseResultBox>()
+        cache.countLimit = 200
+        return cache
+    }()
+
+    /// Reference-type wrapper so MemoryParseResult (a value type) can be stored in NSCache.
+    private final class ParseResultBox: @unchecked Sendable {
+        let result: MemoryParseResult
+        init(_ result: MemoryParseResult) { self.result = result }
+    }
+
     // MARK: - Public Methods
 
     /// Parse text to extract memory moments and clean text
@@ -64,28 +80,33 @@ enum MemoryMomentParser {
             return MemoryParseResult(cleanText: "", moments: [])
         }
 
-        var cleanText = text
+        let key = text as NSString
+        if let cached = parseCache.object(forKey: key) {
+            return cached.result
+        }
+
         var moments: [MemoryMoment] = []
 
         // Find all matches
         let matches = text.matches(of: memoryPattern)
 
         for match in matches {
-            let fullMatch = String(match.output.0)  // [MEMORY: content]
-            let content = String(match.output.1)    // content (captured group)
+            let fullMatch = String(match.output.0)
+            let content = String(match.output.1)
 
-            // Create memory moment
             let moment = MemoryMoment(
                 content: content,
                 originalTag: fullMatch
             )
             moments.append(moment)
-
-            // Replace tag with just the content in clean text
-            cleanText = cleanText.replacingOccurrences(of: fullMatch, with: content)
         }
 
-        return MemoryParseResult(cleanText: cleanText, moments: moments)
+        // Single-pass replacement
+        let cleanText = text.replacing(memoryPattern) { String($0.output.1) }
+
+        let result = MemoryParseResult(cleanText: cleanText, moments: moments)
+        parseCache.setObject(ParseResultBox(result), forKey: key)
+        return result
     }
 
     /// Check if text contains any memory moment tags

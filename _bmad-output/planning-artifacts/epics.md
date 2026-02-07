@@ -973,7 +973,7 @@ So that **I can review previous coaching sessions**.
 **Technical Notes:**
 - Create HistoryView.swift with adaptive navigation styling
 - Create ConversationRow with domain badge
-- Implement HistoryViewModel with SwiftData queries
+- Implement HistoryViewModel with Supabase queries (SwiftData caching deferred to Story 7.1)
 - Support continuation of past conversations
 
 ---

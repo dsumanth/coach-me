@@ -12,6 +12,7 @@ import AuthenticationServices
 /// Per architecture.md: Apply warm color palette from Colors.swift
 struct WelcomeView: View {
     @State private var viewModel = AuthViewModel()
+    @Environment(\.colorScheme) private var colorScheme
 
     /// Callback when authentication succeeds
     var onAuthenticated: (() -> Void)?
@@ -22,7 +23,7 @@ struct WelcomeView: View {
     var body: some View {
         ZStack {
             // Warm background
-            Color.cream
+            Color.adaptiveCream(colorScheme)
                 .ignoresSafeArea()
 
             VStack(spacing: 0) {
@@ -75,12 +76,12 @@ struct WelcomeView: View {
             // App name
             Text("Coach")
                 .font(.system(size: 48, weight: .bold, design: .rounded))
-                .foregroundColor(Color.warmGray900)
+                .foregroundColor(Color.adaptiveText(colorScheme))
 
             // Tagline
             Text("Your personal coach,\nwhenever you need")
                 .font(.title3)
-                .foregroundColor(Color.warmGray800)
+                .foregroundColor(Color.adaptiveText(colorScheme, isPrimary: false))
                 .multilineTextAlignment(.center)
                 .lineSpacing(4)
         }
@@ -94,7 +95,7 @@ struct WelcomeView: View {
             // Explanatory text
             Text("Sign in to save your conversations\nand get personalized coaching")
                 .font(.subheadline)
-                .foregroundColor(Color.warmGray800)
+                .foregroundColor(Color.adaptiveText(colorScheme, isPrimary: false))
                 .multilineTextAlignment(.center)
                 .lineSpacing(2)
 
@@ -104,7 +105,7 @@ struct WelcomeView: View {
             } onCompletion: { result in
                 viewModel.handleAppleSignIn(result: result)
             }
-            .signInWithAppleButtonStyle(.black)
+            .signInWithAppleButtonStyle(colorScheme == .dark ? .white : .black)
             .frame(height: 50)
             .clipShape(RoundedRectangle(cornerRadius: 8))
             .accessibilityLabel("Sign in with Apple")
@@ -118,7 +119,7 @@ struct WelcomeView: View {
         VStack(spacing: 8) {
             Text("AI coaching, not therapy or mental health treatment")
                 .font(.caption)
-                .foregroundColor(Color.warmGray800.opacity(0.8))
+                .foregroundColor(Color.adaptiveText(colorScheme, isPrimary: false).opacity(0.88))
                 .multilineTextAlignment(.center)
 
             Link(destination: Self.termsOfServiceURL) {
@@ -140,14 +141,14 @@ struct WelcomeView: View {
             VStack(spacing: 16) {
                 ProgressView()
                     .scaleEffect(1.2)
-                    .tint(Color.warmGray900)
+                    .tint(Color.adaptiveText(colorScheme))
 
                 Text("Signing in...")
                     .font(.subheadline)
-                    .foregroundColor(Color.warmGray900)
+                    .foregroundColor(Color.adaptiveText(colorScheme))
             }
             .padding(32)
-            .background(Color.cream)
+            .background(Color.adaptiveSurface(colorScheme))
             .clipShape(RoundedRectangle(cornerRadius: 16))
             .shadow(color: .black.opacity(0.1), radius: 10, y: 5)
         }

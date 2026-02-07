@@ -12,6 +12,8 @@ import SwiftUI
 /// Card displaying a single extracted insight for user confirmation
 /// Uses warm, first-person copy per UX guidelines
 struct InsightSuggestionCard: View {
+    @Environment(\.colorScheme) private var colorScheme
+
     // MARK: - Properties
 
     /// The insight to display
@@ -40,12 +42,12 @@ struct InsightSuggestionCard: View {
                 VStack(alignment: .leading, spacing: DesignConstants.Spacing.xs) {
                     Text(promptText)
                         .font(.subheadline)
-                        .foregroundStyle(Color.warmGray600)
+                        .foregroundStyle(Color.adaptiveText(colorScheme, isPrimary: false))
 
                     Text(insight.content)
                         .font(.body)
                         .fontWeight(.medium)
-                        .foregroundStyle(Color.warmGray900)
+                        .foregroundStyle(Color.adaptiveText(colorScheme))
                 }
             }
 
@@ -73,7 +75,7 @@ struct InsightSuggestionCard: View {
                 } label: {
                     Text("Not quite")
                         .font(.subheadline)
-                        .foregroundStyle(Color.warmGray500)
+                        .foregroundStyle(Color.adaptiveText(colorScheme, isPrimary: false))
                         .frame(maxWidth: .infinity)
                         .frame(height: DesignConstants.Size.buttonSmall)
                 }
@@ -90,64 +92,56 @@ struct InsightSuggestionCard: View {
         .accessibilityLabel(accessibilityDescription)
     }
 
+    // MARK: - Category Style
+
+    private struct CategoryStyle {
+        let icon: Image
+        let color: Color
+        let promptText: String
+        let accessibilityName: String
+    }
+
+    private var categoryStyle: CategoryStyle {
+        switch insight.category {
+        case .value:
+            return CategoryStyle(
+                icon: Image(systemName: "heart.fill"),
+                color: Color.terracotta,
+                promptText: "I noticed this seems important to you:",
+                accessibilityName: "Value"
+            )
+        case .goal:
+            return CategoryStyle(
+                icon: Image(systemName: "target"),
+                color: Color.sage,
+                promptText: "It sounds like you're working toward:",
+                accessibilityName: "Goal"
+            )
+        case .situation:
+            return CategoryStyle(
+                icon: Image(systemName: "person.fill"),
+                color: Color.warmGray600,
+                promptText: "I heard you mention:",
+                accessibilityName: "Life situation"
+            )
+        case .pattern:
+            return CategoryStyle(
+                icon: Image(systemName: "chart.line.uptrend.xyaxis"),
+                color: Color.dustyRose,
+                promptText: "I noticed a pattern:",
+                accessibilityName: "Pattern"
+            )
+        }
+    }
+
     // MARK: - Computed Properties
 
-    /// Icon for the insight category
-    private var categoryIcon: Image {
-        switch insight.category {
-        case .value:
-            return Image(systemName: "heart.fill")
-        case .goal:
-            return Image(systemName: "target")
-        case .situation:
-            return Image(systemName: "person.fill")
-        case .pattern:
-            return Image(systemName: "chart.line.uptrend.xyaxis")
-        }
-    }
+    private var categoryIcon: Image { categoryStyle.icon }
+    private var categoryColor: Color { categoryStyle.color }
+    private var promptText: String { categoryStyle.promptText }
 
-    /// Color for the insight category
-    private var categoryColor: Color {
-        switch insight.category {
-        case .value:
-            return Color.terracotta
-        case .goal:
-            return Color.sage
-        case .situation:
-            return Color.warmGray600
-        case .pattern:
-            return Color.dustyRose
-        }
-    }
-
-    /// Warm prompt text based on category
-    private var promptText: String {
-        switch insight.category {
-        case .value:
-            return "I noticed this seems important to you:"
-        case .goal:
-            return "It sounds like you're working toward:"
-        case .situation:
-            return "I heard you mention:"
-        case .pattern:
-            return "I noticed a pattern:"
-        }
-    }
-
-    /// Full accessibility description
     private var accessibilityDescription: String {
-        let categoryName: String
-        switch insight.category {
-        case .value:
-            categoryName = "Value"
-        case .goal:
-            categoryName = "Goal"
-        case .situation:
-            categoryName = "Life situation"
-        case .pattern:
-            categoryName = "Pattern"
-        }
-        return "\(categoryName) suggestion: \(insight.content)"
+        "\(categoryStyle.accessibilityName) suggestion: \(insight.content)"
     }
 }
 

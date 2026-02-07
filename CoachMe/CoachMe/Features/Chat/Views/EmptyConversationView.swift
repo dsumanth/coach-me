@@ -10,6 +10,8 @@ import SwiftUI
 /// Empty state when no messages exist
 /// Per architecture.md: Empty states with personality (UX-9)
 struct EmptyConversationView: View {
+    @Environment(\.colorScheme) private var colorScheme
+
     /// Callback when a conversation starter is tapped
     let onStarterTapped: (String) -> Void
 
@@ -39,16 +41,16 @@ struct EmptyConversationView: View {
         VStack(spacing: 12) {
             Image(systemName: "bubble.left.and.text.bubble.right.fill")
                 .font(.system(size: 48))
-                .foregroundStyle(Color.terracotta.opacity(0.8))
+                .foregroundStyle(Color.adaptiveTerracotta(colorScheme).opacity(0.85))
                 .accessibilityHidden(true)
 
             Text("What's on your mind?")
                 .font(.title2.weight(.semibold))
-                .foregroundColor(Color.warmGray900)
+                .foregroundColor(Color.adaptiveText(colorScheme))
 
             Text("I'm here to help you reflect, plan, and grow.")
                 .font(.subheadline)
-                .foregroundColor(Color.warmGray700)
+                .foregroundColor(Color.adaptiveText(colorScheme, isPrimary: false))
                 .multilineTextAlignment(.center)
         }
         .accessibilityElement(children: .combine)
@@ -62,11 +64,15 @@ struct EmptyConversationView: View {
                 Button(action: { onStarterTapped(starter) }) {
                     Text(starter)
                         .font(.subheadline)
-                        .foregroundColor(Color.warmGray800)
+                        .foregroundColor(Color.adaptiveText(colorScheme))
                         .padding(.horizontal, 16)
                         .padding(.vertical, 12)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(Color.warmGray100)
+                        .background(
+                            colorScheme == .dark
+                                ? Color.warmGray700.opacity(0.62)
+                                : Color.warmGray100
+                        )
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                 }
                 .accessibilityLabel("Start with: \(starter)")

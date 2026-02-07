@@ -107,7 +107,7 @@ final class ContextExtractionService: ContextExtractionServiceProtocol {
 
     // MARK: - Properties
 
-    private let extractURL: URL
+    private let extractURL: URL?
     private let supabaseKey: String
     private let session: URLSession
     private var authToken: String?
@@ -122,9 +122,12 @@ final class ContextExtractionService: ContextExtractionServiceProtocol {
         supabaseKey: String = Configuration.supabasePublishableKey,
         session: URLSession = .shared
     ) {
-        guard let url = URL(string: "\(supabaseURL)/functions/v1/extract-context") else {
-            fatalError("Invalid Supabase URL configuration: \(supabaseURL)")
+        let url = URL(string: "\(supabaseURL)/functions/v1/extract-context")
+        #if DEBUG
+        if url == nil {
+            assertionFailure("Invalid Supabase URL configuration: \(supabaseURL)")
         }
+        #endif
         self.extractURL = url
         self.supabaseKey = supabaseKey
         self.session = session
@@ -151,6 +154,10 @@ final class ContextExtractionService: ContextExtractionServiceProtocol {
     ) async throws -> [ExtractedInsight] {
         guard let token = authToken else {
             throw ContextExtractionError.notAuthenticated
+        }
+
+        guard let extractURL else {
+            throw ContextExtractionError.extractionFailed("Service configuration is invalid.")
         }
 
         // Build request

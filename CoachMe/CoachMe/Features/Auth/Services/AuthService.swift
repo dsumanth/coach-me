@@ -113,7 +113,9 @@ final class AuthService {
 
                 // Check if token is expired and refresh if needed
                 // The session.expiresAt is Unix timestamp
-                if session.expiresAt < Date().timeIntervalSince1970 {
+                // Refresh 60 seconds before actual expiry to avoid edge cases
+                let bufferSeconds: TimeInterval = 60
+                if session.expiresAt < Date().timeIntervalSince1970 + bufferSeconds {
                     #if DEBUG
                     print("AuthService: Access token expired, refreshing...")
                     #endif

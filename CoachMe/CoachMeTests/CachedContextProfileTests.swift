@@ -259,7 +259,8 @@ final class CachedContextProfileTests: XCTestCase {
     func testSwiftDataUniqueConstraint() throws {
         let userId = UUID()
         let profile1 = ContextProfile.empty(userId: userId)
-        let profile2 = ContextProfile.empty(userId: userId)
+        var profile2 = ContextProfile.empty(userId: userId)
+        profile2.addValue(ContextValue.userValue("distinguishing value"))
 
         let cached1 = try CachedContextProfile.from(profile1)
         let cached2 = try CachedContextProfile.from(profile2)
@@ -270,15 +271,19 @@ final class CachedContextProfileTests: XCTestCase {
 
         // Insert second cache with same userId - should replace due to unique constraint
         modelContext.insert(cached2)
+        try modelContext.save()
 
-        // The unique constraint behavior may vary, but we should only have one entry
+        // The unique constraint should ensure only one entry per userId
         let descriptor = FetchDescriptor<CachedContextProfile>()
         let results = try modelContext.fetch(descriptor)
         let matching = results.filter { $0.userId == userId }
 
-        // SwiftData with unique constraint will either reject or update
-        // We verify there's at least one valid entry
-        XCTAssertGreaterThanOrEqual(matching.count, 1)
+        // SwiftData with unique constraint should have exactly one entry
+        XCTAssertEqual(matching.count, 1, "Unique constraint should ensure only one entry per userId")
+
+        // Verify the latest data is present (profile2's value)
+        let decoded = matching.first?.decodeProfile()
+        XCTAssertEqual(decoded?.values.count, 1, "Should have the updated profile's values")
     }
 
     func testSwiftDataDeletion() throws {

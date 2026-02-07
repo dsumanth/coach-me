@@ -50,19 +50,23 @@ struct ContextEditorSheet: View {
                 if isMultiline {
                     TextEditor(text: $editedContent)
                         .font(.body)
-                        .foregroundStyle(Color.adaptiveText(colorScheme))
+                        .foregroundColor(colorScheme == .dark ? .white.opacity(0.95) : Color.warmGray900)
                         .frame(minHeight: 120)
                         .padding(DesignConstants.Spacing.sm)
-                        .background(Color.adaptiveSurface(colorScheme))
-                        .clipShape(RoundedRectangle(cornerRadius: DesignConstants.CornerRadius.input))
+                        .modifier(ContextEditorInputSurfaceModifier(colorScheme: colorScheme))
                         .focused($isTextFieldFocused)
                         .accessibilityLabel("\(headerTitle) editor")
                 } else {
-                    TextField(placeholder, text: $editedContent)
+                    TextField(
+                        "",
+                        text: $editedContent,
+                        prompt: Text(placeholder)
+                            .foregroundStyle(colorScheme == .dark ? .white.opacity(0.45) : Color.warmGray500.opacity(0.9))
+                    )
                         .font(.body)
+                        .foregroundColor(colorScheme == .dark ? .white.opacity(0.95) : Color.warmGray900)
                         .padding(DesignConstants.Spacing.md)
-                        .background(Color.adaptiveSurface(colorScheme))
-                        .clipShape(RoundedRectangle(cornerRadius: DesignConstants.CornerRadius.input))
+                        .modifier(ContextEditorInputSurfaceModifier(colorScheme: colorScheme))
                         .focused($isTextFieldFocused)
                         .accessibilityLabel("\(headerTitle) editor")
                         .submitLabel(.done)
@@ -74,14 +78,14 @@ struct ContextEditorSheet: View {
                 Spacer()
             }
             .padding(DesignConstants.Spacing.lg)
-            .background(Color.adaptiveCream(colorScheme).ignoresSafeArea())
+            .adaptiveGlassSheet()
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
                         onCancel()
                     }
-                    .foregroundStyle(Color.warmGray500)
+                    .foregroundStyle(colorScheme == .dark ? .white.opacity(0.88) : Color.warmGray600)
                 }
 
                 ToolbarItem(placement: .confirmationAction) {
@@ -99,7 +103,8 @@ struct ContextEditorSheet: View {
         .onAppear {
             editedContent = editItem.currentContent
             // Auto-focus after a brief delay
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(300))
                 isTextFieldFocused = true
             }
         }
@@ -156,6 +161,37 @@ struct ContextEditorSheet: View {
         let trimmed = editedContent.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
         onSave(trimmed)
+    }
+}
+
+private struct ContextEditorInputSurfaceModifier: ViewModifier {
+    let colorScheme: ColorScheme
+
+    func body(content: Content) -> some View {
+        let shape = RoundedRectangle(cornerRadius: DesignConstants.CornerRadius.input, style: .continuous)
+        if #available(iOS 26, *) {
+            content
+                .background {
+                    shape
+                        .fill(.clear)
+                        .glassEffect(.regular, in: shape)
+                    shape
+                        .fill(Color.white.opacity(colorScheme == .dark ? 0.02 : 0.03))
+                }
+                .overlay(
+                    shape
+                        .stroke(Color.white.opacity(colorScheme == .dark ? 0.2 : 0.26), lineWidth: 1)
+                )
+                .clipShape(shape)
+        } else {
+            content
+                .background(.regularMaterial, in: shape)
+                .overlay(
+                    shape
+                        .stroke(Color.white.opacity(colorScheme == .dark ? 0.16 : 0.22), lineWidth: 0.8)
+                )
+                .clipShape(shape)
+        }
     }
 }
 

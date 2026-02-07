@@ -1,6 +1,6 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { handleCors } from '../_shared/cors.ts';
-import { verifyAuth } from '../_shared/auth.ts';
+import { verifyAuth, AuthorizationError } from '../_shared/auth.ts';
 import { errorResponse, sseHeaders } from '../_shared/response.ts';
 import { streamChatCompletion, calculateCost, type ChatMessage } from '../_shared/llm-client.ts';
 import { logUsage } from '../_shared/cost-tracker.ts';
@@ -85,6 +85,7 @@ serve(async (req: Request) => {
     // AC2: Stream response via SSE
     const assistantMessageId = crypto.randomUUID();
     let fullContent = '';
+    let memoryMomentFound = false;
     let tokenUsage = { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 };
     const model = 'claude-sonnet-4-20250514';
 
@@ -97,12 +98,15 @@ serve(async (req: Request) => {
             if (chunk.type === 'token' && chunk.content) {
               fullContent += chunk.content;
               // Story 2.4: Detect memory moments in streamed content (AC #4)
-              const memoryMoment = hasMemoryMoments(fullContent);
+              // Short-circuit: skip scanning once a memory moment is found
+              if (!memoryMomentFound) {
+                memoryMomentFound = hasMemoryMoments(fullContent);
+              }
               // Send SSE event with memory_moment flag
               const event = `data: ${JSON.stringify({
                 type: 'token',
                 content: chunk.content,
-                memory_moment: memoryMoment
+                memory_moment: memoryMomentFound
               })}\n\n`;
               controller.enqueue(encoder.encode(event));
             }
@@ -181,8 +185,11 @@ serve(async (req: Request) => {
   } catch (error) {
     console.error('Chat stream error:', error);
     // AC4: Return graceful error
-    const errorMessage = (error as Error).message;
-    return errorResponse(errorMessage, errorMessage.includes('authorization') ? 401 : 500);
+    if (error instanceof AuthorizationError) {
+      return errorResponse((error as Error).message, 401);
+    }
+    // Don't leak internal error details for 500s
+    return errorResponse('An unexpected error occurred', 500);
   }
 });
 

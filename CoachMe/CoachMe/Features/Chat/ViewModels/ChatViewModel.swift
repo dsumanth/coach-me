@@ -77,6 +77,9 @@ final class ChatViewModel {
     /// Last user message content (for retry)
     private var lastUserMessageContent: String?
 
+    /// User message IDs that failed to send and should show inline retry UI
+    private var failedUserMessageIDs: Set<UUID> = []
+
     // MARK: - Dependencies
 
     /// Chat stream service for SSE communication
@@ -125,6 +128,7 @@ final class ChatViewModel {
         // Add user message immediately
         let userMessage = ChatMessage.userMessage(content: trimmedInput, conversationId: conversationId)
         messages.append(userMessage)
+        failedUserMessageIDs.remove(userMessage.id)
         inputText = ""
 
         // Start streaming state
@@ -132,6 +136,7 @@ final class ChatViewModel {
         isStreaming = false
         streamingContent = ""
         currentResponseHasMemoryMoments = false  // Story 2.4: Reset memory moment tracking
+        showError = false
         tokenBuffer?.reset()
 
         // Create a tracked task for cancellation support
@@ -182,14 +187,15 @@ final class ChatViewModel {
                         messages.append(assistantMessage)
                         streamingContent = ""
                         isStreaming = false
+                        error = nil
                         lastUserMessageContent = nil  // Clear retry state on success
 
                     case .error(let message):
-                        // Keep partial content for retry
                         tokenBuffer?.flush()
                         isStreaming = false
+                        streamingContent = ""
                         self.error = .streamError(message)
-                        showError = true
+                        markUserMessageFailed(userMessage.id)
                     }
                 }
 
@@ -199,18 +205,22 @@ final class ChatViewModel {
                     tokenBuffer?.flush()
                     isStreaming = false
 
-                    // If we have partial content, create a message from it
-                    if !streamingContent.isEmpty {
+                    // If we have meaningful partial content, create a message from it
+                    // Short fragments (< 20 chars) are likely incomplete words/tokens, not useful to display
+                    if streamingContent.count > 20 {
                         let assistantMessage = ChatMessage(
                             id: currentStreamMessageId ?? UUID(),
                             conversationId: conversationId,
                             role: .assistant,
-                            content: streamingContent,
+                            content: streamingContent + "…",
                             createdAt: Date()
                         )
                         messages.append(assistantMessage)
                         streamingContent = ""
                         lastUserMessageContent = nil
+                    } else {
+                        // Discard fragment; allow retry of original message
+                        streamingContent = ""
                     }
                 }
             } catch is CancellationError {
@@ -225,25 +235,30 @@ final class ChatViewModel {
                 isStreaming = false
                 if case .notAuthenticated = convError {
                     self.error = .sessionExpired
+                    showError = true
                 } else {
                     self.error = .messageFailed(convError)
+                    markUserMessageFailed(userMessage.id)
                 }
-                showError = true
+                streamingContent = ""
             } catch let streamError as ChatStreamError {
                 // Handle stream-specific errors with proper mapping
                 tokenBuffer?.flush()
                 isStreaming = false
                 if case .httpError(let statusCode) = streamError, statusCode == 401 {
                     self.error = .sessionExpired
+                    showError = true
                 } else {
                     self.error = .messageFailed(streamError)
+                    markUserMessageFailed(userMessage.id)
                 }
-                showError = true
+                streamingContent = ""
             } catch {
                 tokenBuffer?.flush()
                 isStreaming = false
                 self.error = .messageFailed(error)
-                showError = true
+                markUserMessageFailed(userMessage.id)
+                streamingContent = ""
             }
         }
         currentSendTask = task
@@ -274,6 +289,25 @@ final class ChatViewModel {
         await sendMessage()
     }
 
+    /// Returns true when a specific user message failed delivery and should show retry UI.
+    func isMessageDeliveryFailed(_ messageID: UUID) -> Bool {
+        failedUserMessageIDs.contains(messageID)
+    }
+
+    /// Retries sending a specific failed user message (iMessage-style inline retry).
+    func retryFailedMessage(_ messageID: UUID) async {
+        guard let failedMessage = messages.first(where: { $0.id == messageID && $0.role == .user }) else {
+            return
+        }
+
+        guard failedUserMessageIDs.contains(messageID) else { return }
+
+        failedUserMessageIDs.remove(messageID)
+        messages.removeAll { $0.id == messageID }
+        inputText = failedMessage.content
+        await sendMessage()
+    }
+
     /// Dismisses the current error
     func dismissError() {
         showError = false
@@ -292,6 +326,7 @@ final class ChatViewModel {
         currentResponseHasMemoryMoments = false  // Story 2.4: Reset memory moment tracking
         tokenBuffer?.reset()
         lastUserMessageContent = nil
+        failedUserMessageIDs.removeAll()
         error = nil
         showError = false
     }
@@ -374,5 +409,13 @@ final class ChatViewModel {
         #endif
 
         chatStreamService.setAuthToken(token)
+    }
+
+    /// Marks a user message as failed so UI can show inline retry instead of an alert popup.
+    private func markUserMessageFailed(_ messageID: UUID) {
+        failedUserMessageIDs.insert(messageID)
+        showError = false
+        isLoading = false
+        isStreaming = false
     }
 }

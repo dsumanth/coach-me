@@ -61,6 +61,52 @@ extension Color {
     /// #D4A574 (212, 165, 116) - softer, more muted gold that reads as "memory" not "warning"
     static let memoryIndicatorDark = Color(red: 212/255, green: 165/255, blue: 116/255)
 
+    // MARK: - Domain Colors (Light Mode)
+
+    /// Life coaching - warm teal (growth, vitality)
+    static let domainLife = Color(red: 45/255, green: 148/255, blue: 136/255)
+
+    /// Career coaching - professional slate blue
+    static let domainCareer = Color(red: 59/255, green: 102/255, blue: 155/255)
+
+    /// Relationships coaching - warm rose
+    static let domainRelationships = Color(red: 186/255, green: 96/255, blue: 114/255)
+
+    /// Mindset coaching - deep warm purple
+    static let domainMindset = Color(red: 126/255, green: 87/255, blue: 155/255)
+
+    /// Creativity coaching - vibrant amber-orange
+    static let domainCreativity = Color(red: 214/255, green: 132/255, blue: 32/255)
+
+    /// Fitness coaching - energetic green
+    static let domainFitness = Color(red: 56/255, green: 142/255, blue: 60/255)
+
+    /// Leadership coaching - rich bronze-gold
+    static let domainLeadership = Color(red: 161/255, green: 115/255, blue: 42/255)
+
+    // MARK: - Domain Colors (Dark Mode)
+
+    /// Life coaching dark - brighter teal for contrast
+    static let domainLifeDark = Color(red: 72/255, green: 187/255, blue: 173/255)
+
+    /// Career coaching dark - brighter blue
+    static let domainCareerDark = Color(red: 90/255, green: 140/255, blue: 200/255)
+
+    /// Relationships coaching dark - brighter rose
+    static let domainRelationshipsDark = Color(red: 220/255, green: 130/255, blue: 150/255)
+
+    /// Mindset coaching dark - brighter purple
+    static let domainMindsetDark = Color(red: 165/255, green: 125/255, blue: 195/255)
+
+    /// Creativity coaching dark - brighter amber
+    static let domainCreativityDark = Color(red: 245/255, green: 166/255, blue: 55/255)
+
+    /// Fitness coaching dark - brighter green
+    static let domainFitnessDark = Color(red: 90/255, green: 185/255, blue: 95/255)
+
+    /// Leadership coaching dark - brighter gold
+    static let domainLeadershipDark = Color(red: 205/255, green: 155/255, blue: 65/255)
+
     // MARK: - Dark Mode Surface Colors
 
     /// Light surface in dark mode

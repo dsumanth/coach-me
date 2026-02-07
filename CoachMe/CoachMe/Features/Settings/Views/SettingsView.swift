@@ -15,6 +15,9 @@ struct SettingsView: View {
     // MARK: - Environment
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.router) private var router
+    @AppStorage(AppAppearance.storageKey) private var appAppearanceRawValue = AppAppearance.system.rawValue
 
     // MARK: - State
 
@@ -23,13 +26,19 @@ struct SettingsView: View {
     var body: some View {
         ZStack {
             // Warm background
-            Color.cream
+            Color.adaptiveCream(colorScheme)
                 .ignoresSafeArea()
 
             ScrollView {
                 VStack(spacing: 24) {
+                    // Appearance section
+                    appearanceSection
+
                     // Data Management Section
                     dataManagementSection
+
+                    // Account Section
+                    accountSection
                 }
                 .padding(16)
             }
@@ -58,7 +67,7 @@ struct SettingsView: View {
                 Button("Done") {
                     dismiss()
                 }
-                .foregroundStyle(Color.terracotta)
+                .foregroundStyle(Color.adaptiveTerracotta(colorScheme))
             }
         }
         // Delete all confirmation alert (Task 5.4)
@@ -69,6 +78,21 @@ struct SettingsView: View {
                     dismiss()
                 }
             }
+        }
+        // Sign out confirmation alert
+        .alert("Sign out?", isPresented: $viewModel.showSignOutConfirmation) {
+            Button("Cancel", role: .cancel) {}
+            Button("Sign out", role: .destructive) {
+                Task {
+                    let success = await viewModel.signOut()
+                    if success {
+                        dismiss()
+                        router.navigateToWelcome()
+                    }
+                }
+            }
+        } message: {
+            Text("You'll need to sign in again to continue coaching.")
         }
         // Error alert
         .alert("Oops", isPresented: $viewModel.showError) {
@@ -82,13 +106,38 @@ struct SettingsView: View {
 
     // MARK: - Sections
 
+    /// Appearance section with app-wide theme mode selection
+    private var appearanceSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Appearance")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(Color.adaptiveText(colorScheme, isPrimary: false))
+                .padding(.horizontal, 4)
+
+            VStack(alignment: .leading, spacing: 10) {
+                Picker("Appearance", selection: appearanceBinding) {
+                    ForEach(AppAppearance.allCases) { mode in
+                        Text(mode.shortLabel).tag(mode)
+                    }
+                }
+                .pickerStyle(.segmented)
+
+                Text("Choose White, Dark, or follow your device setting.")
+                    .font(.caption)
+                    .foregroundStyle(Color.adaptiveText(colorScheme, isPrimary: false))
+            }
+            .padding(16)
+            .adaptiveGlass()
+        }
+    }
+
     /// Data management section with clear all conversations option
     private var dataManagementSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             // Section header
             Text("Data")
                 .font(.subheadline.weight(.semibold))
-                .foregroundStyle(Color.warmGray500)
+                .foregroundStyle(Color.adaptiveText(colorScheme, isPrimary: false))
                 .padding(.horizontal, 4)
 
             // Clear all conversations row (Task 5.2)
@@ -105,29 +154,76 @@ struct SettingsView: View {
 
                                 Text("Clear all conversations")
                                     .font(.body)
-                                    .foregroundStyle(Color.warmGray900)
+                                    .foregroundStyle(Color.adaptiveText(colorScheme))
                             }
 
                             Text("This will remove all your conversation history")
                                 .font(.caption)
-                                .foregroundStyle(Color.warmGray500)
+                                .foregroundStyle(Color.adaptiveText(colorScheme, isPrimary: false))
                         }
 
                         Spacer()
 
                         Image(systemName: "chevron.right")
                             .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(Color.warmGray400)
+                            .foregroundStyle(Color.adaptiveText(colorScheme, isPrimary: false))
                     }
                     .padding(16)
                 }
                 .accessibilityLabel("Clear all conversations")
                 .accessibilityHint("Tap to remove all your conversation history")
             }
-            .background(Color.warmGray50)
-            .clipShape(RoundedRectangle(cornerRadius: 12))
             .adaptiveGlass()  // Task 5.6
         }
+    }
+
+    /// Account section with sign out option
+    private var accountSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Account")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(Color.adaptiveText(colorScheme, isPrimary: false))
+                .padding(.horizontal, 4)
+
+            VStack(spacing: 0) {
+                Button {
+                    viewModel.showSignOutConfirmation = true
+                } label: {
+                    HStack {
+                        HStack(spacing: 8) {
+                            Image(systemName: "rectangle.portrait.and.arrow.right")
+                                .font(.system(size: 16, weight: .medium))
+                                .foregroundStyle(Color.red)
+
+                            Text("Sign out")
+                                .font(.body)
+                                .foregroundStyle(Color.adaptiveText(colorScheme))
+                        }
+
+                        Spacer()
+
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(Color.adaptiveText(colorScheme, isPrimary: false))
+                    }
+                    .padding(16)
+                }
+                .accessibilityLabel("Sign out")
+                .accessibilityHint("Signs you out of your account")
+            }
+            .adaptiveGlass()
+        }
+    }
+
+    private var appearanceBinding: Binding<AppAppearance> {
+        Binding(
+            get: {
+                AppAppearance(rawValue: appAppearanceRawValue) ?? .system
+            },
+            set: { newValue in
+                appAppearanceRawValue = newValue.rawValue
+            }
+        )
     }
 }
 

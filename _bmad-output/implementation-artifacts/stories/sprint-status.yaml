@@ -41,7 +41,7 @@ story_location: implementation-artifacts/stories
 
 development_status:
   # ── Epic 1: Project Foundation & Core Chat Experience (9 stories) ──
-  epic-1: in-progress
+  epic-1: done
   1-1-initialize-xcode-project-with-core-dependencies: done
   1-2-adaptive-design-system-foundation: done
   1-3-supabase-project-setup-and-core-database-schema: done
@@ -54,24 +54,24 @@ development_status:
   epic-1-retrospective: optional
 
   # ── Epic 2: Personal Context & Memory (6 stories) ──
-  epic-2: backlog
-  2-1-context-profile-data-model-and-storage: backlog
-  2-2-context-setup-prompt-after-first-session: backlog
-  2-3-progressive-context-extraction: backlog
-  2-4-context-injection-into-coaching-responses: backlog
-  2-5-context-profile-viewing-and-editing: backlog
-  2-6-conversation-deletion: backlog
+  epic-2: done
+  2-1-context-profile-data-model-and-storage: done
+  2-2-context-setup-prompt-after-first-session: done
+  2-3-progressive-context-extraction: done
+  2-4-context-injection-into-coaching-responses: done
+  2-5-context-profile-viewing-and-editing: done
+  2-6-conversation-deletion: done
   epic-2-retrospective: optional
 
   # ── Epic 3: Intelligent Domain Routing & Pattern Recognition (7 stories) ──
-  epic-3: backlog
-  3-1-invisible-domain-routing: backlog
+  epic-3: in-progress
+  3-1-invisible-domain-routing: ready-for-dev
   3-2-domain-configuration-engine: backlog
-  3-3-cross-session-memory-references: backlog
+  3-3-cross-session-memory-references: ready-for-dev
   3-4-pattern-recognition-across-conversations: backlog
   3-5-cross-domain-pattern-synthesis: backlog
-  3-6-multiple-conversation-threads: backlog
-  3-7-conversation-history-view: backlog
+  3-6-multiple-conversation-threads: ready-for-dev
+  3-7-conversation-history-view: ready-for-dev
   epic-3-retrospective: optional
 
   # ── Epic 4: Coaching Safety & Crisis Handling (5 stories) ──

@@ -65,10 +65,18 @@ struct AdaptiveGlassContainer<Content: View>: View {
 
     var body: some View {
         if #available(iOS 26, *) {
-            GlassEffectContainer {
-                content
-                    .padding(padding)
-            }
+            let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+            content
+                .padding(padding)
+                .background {
+                    shape
+                        .fill(.clear)
+                        .glassEffect(.regular, in: shape)
+                    shape
+                        .fill(Color.white.opacity(0.022))
+                }
+                .overlay(shape.stroke(Color.white.opacity(0.16), lineWidth: 1))
+                .clipShape(shape)
         } else {
             content
                 .padding(padding)
@@ -100,9 +108,18 @@ struct AdaptiveGlassSheet<Content: View>: View {
 
     var body: some View {
         if #available(iOS 26, *) {
+            let shape = RoundedRectangle(cornerRadius: DesignConstants.CornerRadius.sheet, style: .continuous)
             content
                 .padding(padding)
-                .background(.thickMaterial)
+                .background {
+                    shape
+                        .fill(.clear)
+                        .glassEffect(.regular, in: shape)
+                    shape
+                        .fill(Color.white.opacity(0.028))
+                }
+                .overlay(shape.stroke(Color.white.opacity(0.18), lineWidth: 1))
+                .clipShape(shape)
         } else {
             content
                 .padding(padding)
@@ -129,13 +146,19 @@ struct AdaptiveGlassInputContainer<Content: View>: View {
 
     var body: some View {
         if #available(iOS 26, *) {
+            let shape = RoundedRectangle(cornerRadius: DesignConstants.CornerRadius.input, style: .continuous)
             content
                 .padding(.horizontal, DesignConstants.Spacing.md)
                 .padding(.vertical, DesignConstants.Spacing.sm)
-                .glassEffect(
-                    .regular,
-                    in: RoundedRectangle(cornerRadius: DesignConstants.CornerRadius.input)
-                )
+                .background {
+                    shape
+                        .fill(.clear)
+                        .glassEffect(.regular, in: shape)
+                    shape
+                        .fill(Color.white.opacity(0.03))
+                }
+                .overlay(shape.stroke(Color.white.opacity(0.22), lineWidth: 1))
+                .clipShape(shape)
         } else {
             content
                 .padding(.horizontal, DesignConstants.Spacing.md)

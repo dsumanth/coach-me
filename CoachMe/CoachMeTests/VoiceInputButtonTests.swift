@@ -61,8 +61,8 @@ struct VoiceInputButtonTests {
 
     // MARK: - Accessibility Tests
 
-    @Test("Button has correct accessibility label when idle")
-    func testAccessibilityLabelIdle() {
+    @Test("Button is in idle state (accessibility label verified via implementation)")
+    func testIdleStateForAccessibility() {
         let button = VoiceInputButton(
             isRecording: false,
             isDisabled: false,
@@ -70,13 +70,12 @@ struct VoiceInputButtonTests {
             onRelease: { }
         )
 
-        // VoiceInputButton should have "Voice input" label when not recording
-        // This is verified by the implementation: .accessibilityLabel(isRecording ? "Stop recording" : "Voice input")
+        // Verifies idle state; actual accessibility label testing requires ViewInspector or XCUITest
         #expect(!button.isRecording)
     }
 
-    @Test("Button has correct accessibility label when recording")
-    func testAccessibilityLabelRecording() {
+    @Test("Button is in recording state (accessibility label verified via implementation)")
+    func testRecordingStateForAccessibility() {
         let button = VoiceInputButton(
             isRecording: true,
             isDisabled: false,
@@ -84,8 +83,7 @@ struct VoiceInputButtonTests {
             onRelease: { }
         )
 
-        // VoiceInputButton should have "Stop recording" label when recording
-        // This is verified by the implementation
+        // Verifies recording state; actual accessibility label testing requires ViewInspector or XCUITest
         #expect(button.isRecording)
     }
 
@@ -97,24 +95,22 @@ struct VoiceInputButtonTests {
     @Test("onPress callback executes when invoked")
     func testOnPressCallbackExecutes() {
         var callbackInvoked = false
-        var capturedOnPress: (() -> Void)?
+        let onPressCallback = { callbackInvoked = true }
 
         let _ = VoiceInputButton(
             isRecording: false,
             isDisabled: false,
-            onPress: {
-                callbackInvoked = true
-                capturedOnPress = { callbackInvoked = true }
-            },
+            onPress: onPressCallback,
             onRelease: { }
         )
 
         // Verify callback is not invoked on creation
         #expect(!callbackInvoked)
 
-        // Manually invoke to verify callback works
-        capturedOnPress?()
-        // Note: This tests the closure is valid; gesture triggers require XCUITest
+        // Manually invoke to verify callback closure is valid
+        onPressCallback()
+        #expect(callbackInvoked)
+        // Note: Testing that gestures trigger callbacks requires XCUITest
     }
 
     @Test("onRelease callback executes when invoked")

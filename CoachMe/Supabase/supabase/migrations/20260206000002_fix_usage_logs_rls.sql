@@ -7,7 +7,8 @@
 -- Drop the overly permissive policy
 DROP POLICY IF EXISTS "Service role can insert usage logs" ON public.usage_logs;
 
--- Create a more secure policy that restricts inserts to own user_id
+-- Recreate the secure policy (drop first to avoid duplicate if already exists)
+DROP POLICY IF EXISTS "Users can insert own usage logs" ON public.usage_logs;
 CREATE POLICY "Users can insert own usage logs"
     ON public.usage_logs
     FOR INSERT

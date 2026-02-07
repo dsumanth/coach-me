@@ -43,6 +43,10 @@ Carthage/Build/
 *.key
 secrets/
 
+# Xcconfig secrets (contains Supabase credentials)
+CoachMe/Debug.xcconfig
+CoachMe/Release.xcconfig
+
 # IDE
 .idea/
 *.code-workspace

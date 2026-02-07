@@ -21,6 +21,8 @@ struct RootView: View {
     @State private var router = Router()
     @State private var authViewModel = AuthViewModel()
     @State private var isCheckingSession = true
+    @Environment(\.colorScheme) private var colorScheme
+    @AppStorage(AppAppearance.storageKey) private var appAppearanceRawValue = AppAppearance.system.rawValue
 
     var body: some View {
         ZStack {
@@ -46,6 +48,7 @@ struct RootView: View {
             }
         }
         .environment(\.router, router)
+        .preferredColorScheme(selectedAppearance.colorScheme)
         .task {
             await checkAuthState()
         }
@@ -75,7 +78,7 @@ struct RootView: View {
     /// Overlay shown while checking for existing session
     private var sessionCheckOverlay: some View {
         ZStack {
-            Color.cream
+            Color.adaptiveCream(colorScheme)
                 .ignoresSafeArea()
 
             VStack(spacing: 16) {
@@ -87,18 +90,22 @@ struct RootView: View {
                 // App name
                 Text("Coach")
                     .font(.system(size: 36, weight: .bold, design: .rounded))
-                    .foregroundColor(Color.warmGray900)
+                    .foregroundColor(Color.adaptiveText(colorScheme))
 
                 // Loading indicator
                 ProgressView()
                     .scaleEffect(0.8)
-                    .tint(Color.warmGray800)
+                    .tint(Color.adaptiveText(colorScheme))
                     .padding(.top, 8)
             }
         }
         .transition(.opacity)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Coach App. Loading...")
+    }
+
+    private var selectedAppearance: AppAppearance {
+        AppAppearance(rawValue: appAppearanceRawValue) ?? .system
     }
 }
 

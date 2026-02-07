@@ -119,14 +119,26 @@ private struct AdaptiveButtonContent: View {
             Color.terracotta
 
         case .secondary:
-            // Note: Using version-checked glass effect inline because ButtonStyle
-            // context requires concrete View types. This follows the architecture's
-            // intent of always version-checking before applying glass effects.
             if #available(iOS 26, *) {
-                Color.clear.glassEffect()
+                let shape = RoundedRectangle(
+                    cornerRadius: DesignConstants.CornerRadius.interactive,
+                    style: .continuous
+                )
+                ZStack {
+                    shape
+                        .fill(.clear)
+                        .glassEffect(.regular, in: shape)
+                    shape
+                        .fill(Color.white.opacity(0.03))
+                    shape
+                        .stroke(Color.white.opacity(0.2), lineWidth: 1)
+                }
             } else {
-                Color.clear
-                    .background(.regularMaterial)
+                RoundedRectangle(
+                    cornerRadius: DesignConstants.CornerRadius.interactive,
+                    style: .continuous
+                )
+                    .fill(.regularMaterial)
                     .shadow(color: .black.opacity(0.1), radius: 2, y: 1)
             }
 
@@ -189,7 +201,16 @@ private struct AdaptiveIconButtonStyle: ButtonStyle {
             // context requires concrete View types.
             .background {
                 if #available(iOS 26, *) {
-                    Circle().fill(.clear).glassEffect()
+                    let shape = Circle()
+                    ZStack {
+                        shape
+                            .fill(.clear)
+                            .glassEffect(.regular, in: shape)
+                        shape
+                            .fill(Color.white.opacity(0.03))
+                        shape
+                            .stroke(Color.white.opacity(0.2), lineWidth: 1)
+                    }
                 } else {
                     Circle()
                         .fill(.regularMaterial)
