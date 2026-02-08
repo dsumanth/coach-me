@@ -358,53 +358,30 @@ final class ChatViewModel {
 
     /// Starts a new conversation, clearing all messages
     func startNewConversation() {
-        currentSendTask?.cancel()
+        resetStateForConversation(id: UUID(), isPersisted: false)
         messages = []
-        currentConversationId = UUID()
-        isConversationPersisted = false  // Reset so new conversation will be created in DB
-        inputText = ""
-        streamingContent = ""
-        isStreaming = false
-        currentResponseHasMemoryMoments = false  // Story 2.4: Reset memory moment tracking
-        currentResponseHasPatternInsights = false  // Story 3.4: Reset pattern insight tracking
-        currentResponseHasCrisisFlag = false  // Story 4.1: Reset crisis flag tracking
-        showCrisisResources = false  // Story 4.5: Dismiss any lingering crisis sheet
-        tokenBuffer?.reset()
-        lastUserMessageContent = nil
-        failedUserMessageIDs.removeAll()
-        error = nil
-        showError = false
     }
 
     /// Loads an existing conversation by fetching its messages (Story 3.6)
     /// - Parameter id: The conversation ID to load
-    func loadConversation(id: UUID) async {
-        // Cancel any in-flight request
-        currentSendTask?.cancel()
+    func loadConversation(id: UUID, alreadyPrimedFromCache: Bool = false) async {
+        resetStateForConversation(id: id, isPersisted: true)
 
-        // Reset state for the new conversation
-        isLoading = true
-        currentConversationId = id
-        isConversationPersisted = true  // Conversation already exists in DB
-        inputText = ""
-        streamingContent = ""
-        isStreaming = false
-        currentResponseHasMemoryMoments = false
-        currentResponseHasPatternInsights = false
-        currentResponseHasCrisisFlag = false  // Story 4.1: Reset crisis flag tracking
-        showCrisisResources = false  // Story 4.5: Dismiss any lingering crisis sheet
-        tokenBuffer?.reset()
-        lastUserMessageContent = nil
-        failedUserMessageIDs.removeAll()
-        error = nil
-        showError = false
+        var hasCachedMessages = alreadyPrimedFromCache && !messages.isEmpty
 
-        // Instant render path: load local cache first.
-        let cachedMessages = ChatMessageCache.load(conversationId: id) ?? []
-        let hasCachedMessages = !cachedMessages.isEmpty
-        messages = cachedMessages
-        if hasCachedMessages {
-            // Keep thread interactive while cloud sync runs in background.
+        if !alreadyPrimedFromCache {
+            isLoading = true
+
+            // Instant render path: load local cache first.
+            let cachedMessages = ChatMessageCache.load(conversationId: id) ?? []
+            hasCachedMessages = !cachedMessages.isEmpty
+            messages = cachedMessages
+            if hasCachedMessages {
+                // Keep thread interactive while cloud sync runs in background.
+                isLoading = false
+            }
+        } else {
+            // Already showing cache-preloaded content from caller.
             isLoading = false
         }
 
@@ -425,6 +402,32 @@ final class ChatViewModel {
                 showError = true
             }
         }
+    }
+
+    /// Preloads a conversation from local cache synchronously for push transition smoothness.
+    /// - Returns: true when cached messages were found and applied.
+    @discardableResult
+    func primeConversationFromCache(id: UUID) -> Bool {
+        resetStateForConversation(id: id, isPersisted: true)
+
+        let cachedMessages = ChatMessageCache.load(conversationId: id) ?? []
+        messages = cachedMessages
+        return !cachedMessages.isEmpty
+    }
+
+    /// Preloads a conversation from caller-provided messages for zero-latency route opens.
+    /// - Returns: true when non-empty messages were applied.
+    @discardableResult
+    func primeConversationFromPreloaded(id: UUID, messages preloadedMessages: [ChatMessage]) -> Bool {
+        resetStateForConversation(id: id, isPersisted: true)
+
+        messages = preloadedMessages
+        if !preloadedMessages.isEmpty {
+            persistCurrentConversationCache()
+            return true
+        }
+
+        return false
     }
 
     /// Refreshes the conversation (pull-to-refresh)
@@ -509,6 +512,27 @@ final class ChatViewModel {
         #endif
 
         chatStreamService.setAuthToken(token)
+    }
+
+    /// Resets all chat state for loading a new or existing conversation.
+    private func resetStateForConversation(id: UUID, isPersisted: Bool) {
+        currentSendTask?.cancel()
+        currentStreamMessageId = nil
+        currentConversationId = id
+        isConversationPersisted = isPersisted
+        inputText = ""
+        streamingContent = ""
+        isStreaming = false
+        isLoading = false
+        currentResponseHasMemoryMoments = false
+        currentResponseHasPatternInsights = false
+        currentResponseHasCrisisFlag = false
+        showCrisisResources = false
+        tokenBuffer?.reset()
+        lastUserMessageContent = nil
+        failedUserMessageIDs.removeAll()
+        error = nil
+        showError = false
     }
 
     /// Marks a user message as failed so UI can show inline retry instead of an alert popup.

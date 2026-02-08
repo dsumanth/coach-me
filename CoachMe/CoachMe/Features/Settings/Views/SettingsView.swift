@@ -97,6 +97,7 @@ struct SettingsView: View {
         } message: {
             Text("You'll need to sign in again to continue coaching.")
         }
+        .preferredColorScheme(selectedAppearance.colorScheme)
         // Error alert
         .alert("Oops", isPresented: $viewModel.showError) {
             Button("OK", role: .cancel) {
@@ -277,6 +278,10 @@ struct SettingsView: View {
             }
             .adaptiveGlass()
         }
+    }
+
+    private var selectedAppearance: AppAppearance {
+        appearanceBinding.wrappedValue
     }
 
     private var appearanceBinding: Binding<AppAppearance> {

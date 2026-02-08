@@ -55,8 +55,18 @@ struct ChatView: View {
     ///   - voiceViewModel: Voice input view model (defaults to new instance)
     init(
         viewModel: ChatViewModel = ChatViewModel(),
-        voiceViewModel: VoiceInputViewModel = VoiceInputViewModel()
+        voiceViewModel: VoiceInputViewModel = VoiceInputViewModel(),
+        initialConversationId: UUID? = nil,
+        initialMessages: [ChatMessage]? = nil
     ) {
+        if let initialConversationId, let initialMessages {
+            // Prime preloaded thread before first render to prevent chat-body fade.
+            _ = viewModel.primeConversationFromPreloaded(id: initialConversationId, messages: initialMessages)
+        } else if let initialConversationId {
+            // Fallback: prime from local cache before first render.
+            _ = viewModel.primeConversationFromCache(id: initialConversationId)
+        }
+
         _viewModel = State(initialValue: viewModel)
         _voiceViewModel = State(initialValue: voiceViewModel)
     }
@@ -72,15 +82,19 @@ struct ChatView: View {
                 chatToolbar
 
                 // Message list or empty state
-                if viewModel.messages.isEmpty {
-                    if shouldShowConversationLoadingState {
-                        loadingConversationState
+                Group {
+                    if viewModel.messages.isEmpty {
+                        if shouldShowConversationLoadingState {
+                            loadingConversationState
+                        } else {
+                            emptyState
+                        }
                     } else {
-                        emptyState
+                        messageList
                     }
-                } else {
-                    messageList
                 }
+                .animation(nil, value: shouldShowConversationLoadingState)
+                .animation(nil, value: viewModel.messages.isEmpty)
             }
 
             if contextPromptViewModel.showPrompt {
@@ -286,15 +300,24 @@ struct ChatView: View {
 
             if let conversationId = routedConversationId {
                 // For conversation opens, load cache/messages first so UI appears instantly.
-                router.selectedConversationId = nil
+                let alreadyPrimedForRoute =
+                    viewModel.currentConversationId == conversationId &&
+                    !viewModel.messages.isEmpty
+
+                let primedFromCache = alreadyPrimedForRoute || viewModel.primeConversationFromCache(id: conversationId)
                 async let authConfiguration: Void = configureAuthToken()
-                await viewModel.loadConversation(id: conversationId)
+                await viewModel.loadConversation(
+                    id: conversationId,
+                    alreadyPrimedFromCache: primedFromCache
+                )
                 _ = await authConfiguration
+                router.selectedConversationId = nil
+                router.selectedConversationPreloadedMessages = nil
             } else if let starter = routedStarter {
                 // Starter prompts need auth configured before send/stream.
-                router.pendingStarterText = nil
                 await configureAuthToken()
                 await viewModel.sendMessage(starter)
+                router.pendingStarterText = nil
             } else {
                 // No route intent, just bootstrap auth/context services.
                 await configureAuthToken()
@@ -304,7 +327,6 @@ struct ChatView: View {
             hasResolvedInitialRoute = true
         }
         .contentShape(Rectangle())
-        .simultaneousGesture(backToInboxSwipeGesture)
     }
 
     // MARK: - Auth Configuration
@@ -514,6 +536,14 @@ struct ChatView: View {
                 .padding(.top, 8)
                 .padding(.bottom, 8)
             }
+            .transaction { transaction in
+                if isOpeningRoutedConversation || !hasResolvedInitialRoute {
+                    transaction.animation = nil
+                    transaction.disablesAnimations = true
+                }
+            }
+            .animation(nil, value: viewModel.messages.count)
+            .animation(nil, value: viewModel.messages.last?.id)
             .refreshable {
                 // Pull-to-refresh for syncing (Task 1.5)
                 // Will integrate with sync service in Story 7.3
@@ -528,10 +558,16 @@ struct ChatView: View {
             }
             .onChange(of: viewModel.messages.last?.id) { _, _ in
                 // Handles cache->server replacement where count may not change.
-                scrollToBottomDeferred(proxy: proxy, animated: false)
+                scrollToBottomDeferred(
+                    proxy: proxy,
+                    animated: !(isOpeningRoutedConversation || !hasResolvedInitialRoute)
+                )
             }
             .onChange(of: viewModel.messages.count) { _, _ in
-                scrollToBottomDeferred(proxy: proxy)
+                scrollToBottomDeferred(
+                    proxy: proxy,
+                    animated: !(isOpeningRoutedConversation || !hasResolvedInitialRoute)
+                )
             }
             .onChange(of: viewModel.isLoading) { _, isLoading in
                 if isLoading {
@@ -665,23 +701,6 @@ struct ChatView: View {
         router.navigateToConversationList()
     }
 
-    /// iMessage-style left-edge swipe back gesture.
-    /// Only triggers from the leading edge and when horizontal intent is clear.
-    private var backToInboxSwipeGesture: some Gesture {
-        DragGesture(minimumDistance: 18, coordinateSpace: .local)
-            .onEnded { value in
-                let startedFromLeftEdge = value.startLocation.x <= 28
-                let horizontalDistance = value.translation.width
-                let verticalDistance = abs(value.translation.height)
-                let predictedHorizontalDistance = value.predictedEndTranslation.width
-                let hasBackIntent = horizontalDistance > 72 || predictedHorizontalDistance > 120
-                let horizontalDominant = horizontalDistance > verticalDistance
-
-                guard startedFromLeftEdge, hasBackIntent, horizontalDominant else { return }
-
-                navigateToInbox()
-            }
-    }
 
     /// Starts a new conversation
     private func startNewConversation() {

@@ -161,7 +161,7 @@ struct ConversationListView: View {
                         preview: viewModel.previewText(for: conversation)
                     )
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ConversationRowPressStyle())
                 .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
                 .listRowBackground(Color.clear)
                 .listRowSeparator(.hidden)
@@ -288,5 +288,21 @@ struct ConversationListView: View {
     private func selectConversation(_ conversation: ConversationService.Conversation) {
         onSelectConversation?(conversation.id)
         router.navigateToChat(conversationId: conversation.id)
+    }
+}
+
+// MARK: - iMessage-Style Row Press Feedback
+
+/// Provides tactile press feedback on conversation rows matching iMessage behavior:
+/// fast press-down with subtle scale + dim, slower release back to normal.
+private struct ConversationRowPressStyle: ButtonStyle {
+    func makeBody(configuration: ButtonStyleConfiguration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.975 : 1.0)
+            .opacity(configuration.isPressed ? 0.7 : 1.0)
+            .animation(
+                .easeOut(duration: configuration.isPressed ? 0.08 : 0.3),
+                value: configuration.isPressed
+            )
     }
 }

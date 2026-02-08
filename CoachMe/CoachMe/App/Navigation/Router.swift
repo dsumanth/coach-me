@@ -8,7 +8,11 @@
 import SwiftUI
 
 /// Navigation coordinator per architecture.md
-/// Manages app-level navigation state between authentication and main content
+/// Manages app-level navigation state between authentication and main content.
+///
+/// Chat ↔ list transitions use NavigationStack (UIKit-level push/pop) to avoid
+/// SwiftUI .transition() being stripped by internal .animation(nil, value:)
+/// modifiers inside ChatView.  Only the welcome crossfade uses SwiftUI transitions.
 @MainActor
 @Observable
 final class Router {
@@ -28,22 +32,30 @@ final class Router {
     /// Conversation ID to load when navigating back to chat from conversation list
     var selectedConversationId: UUID?
 
+    /// Optional preloaded messages for selected conversation to render chat body on first frame.
+    var selectedConversationPreloadedMessages: [ChatMessage]?
+
     /// Starter prompt to send when opening chat from inbox suggestions
     var pendingStarterText: String?
 
+    /// Welcome uses a simple crossfade for auth transitions.
+    var welcomeTransition: AnyTransition { .opacity }
+
     // MARK: - Navigation Methods
 
-    /// Navigate to the chat screen (after successful authentication)
+    /// Navigate to the chat screen.
+    /// NavigationStack observes the currentScreen binding and handles the push animation.
     func navigateToChat() {
         selectedConversationId = nil
+        selectedConversationPreloadedMessages = nil
         pendingStarterText = nil
         currentScreen = .chat
     }
 
     /// Navigate to chat with a specific conversation loaded (Story 3.6)
-    /// - Parameter conversationId: The conversation to load in ChatView
-    func navigateToChat(conversationId: UUID) {
+    func navigateToChat(conversationId: UUID, preloadedMessages: [ChatMessage]? = nil) {
         selectedConversationId = conversationId
+        selectedConversationPreloadedMessages = preloadedMessages
         pendingStarterText = nil
         currentScreen = .chat
     }
@@ -51,20 +63,29 @@ final class Router {
     /// Navigate to chat and prefill/send a starter prompt from inbox
     func navigateToChat(starter: String) {
         selectedConversationId = nil
+        selectedConversationPreloadedMessages = nil
         pendingStarterText = starter
         currentScreen = .chat
     }
 
     /// Navigate to the welcome screen (after sign out or session expiry)
     func navigateToWelcome() {
-        currentScreen = .welcome
+        withAnimation(.easeInOut(duration: 0.3)) {
+            currentScreen = .welcome
+        }
     }
 
-    /// Navigate to conversation list (Story 3.6)
-    /// Note: History is now sheet-based from ChatView (Story 3.7).
-    /// This method and .conversationList screen are kept for potential future tab-based navigation refactor.
+    /// Navigate to conversation list.
+    /// From chat: NavigationStack handles the pop animation natively.
+    /// From welcome: uses SwiftUI crossfade transition.
     func navigateToConversationList() {
-        currentScreen = .conversationList
+        if currentScreen == .chat {
+            currentScreen = .conversationList
+        } else {
+            withAnimation(.easeInOut(duration: 0.3)) {
+                currentScreen = .conversationList
+            }
+        }
     }
 }
 

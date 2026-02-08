@@ -41,6 +41,9 @@ final class ConversationListViewModel {
     /// Cached role of the last message, used for "You:" prefix
     var lastMessageRoleByConversation: [UUID: ChatMessage.Role] = [:]
 
+    /// Recently fetched message arrays keyed by conversation, used to open threads instantly.
+    private(set) var preloadedMessagesByConversation: [UUID: [ChatMessage]] = [:]
+
     /// True when the list on screen is coming from local cache while cloud refresh is in-flight.
     var isShowingCachedData = false
 
@@ -170,6 +173,11 @@ final class ConversationListViewModel {
         return "Start a conversation"
     }
 
+    /// Returns preloaded full messages for a conversation when available.
+    func preloadedMessages(for conversation: ConversationService.Conversation) -> [ChatMessage]? {
+        preloadedMessagesByConversation[conversation.id]
+    }
+
     /// Returns whether the latest message is from the user.
     func isLastMessageFromUser(for conversation: ConversationService.Conversation) -> Bool {
         lastMessageRoleByConversation[conversation.id] == .user
@@ -181,6 +189,7 @@ final class ConversationListViewModel {
     private func loadLastMessagePreviews(for conversations: [ConversationService.Conversation]) async {
         var previews: [UUID: String] = [:]
         var roles: [UUID: ChatMessage.Role] = [:]
+        var preloaded: [UUID: [ChatMessage]] = [:]
 
         // Keep this bounded to avoid excessive per-load requests on large histories.
         for conversation in conversations.prefix(30) where conversation.messageCount > 0 {
@@ -190,10 +199,14 @@ final class ConversationListViewModel {
             }
             previews[conversation.id] = normalizedPreview(last.content)
             roles[conversation.id] = last.role
+            // Preload last 50 messages max to bound memory
+            preloaded[conversation.id] = Array(messages.suffix(50))
+            ChatMessageCache.save(messages: messages, conversationId: conversation.id)
         }
 
         lastMessagePreviewByConversation = previews
         lastMessageRoleByConversation = roles
+        preloadedMessagesByConversation = preloaded
     }
 
     /// Flattens whitespace so previews stay single-line and readable.
