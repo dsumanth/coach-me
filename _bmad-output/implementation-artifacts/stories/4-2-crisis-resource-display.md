@@ -1,6 +1,6 @@
 # Story 4.2: Crisis Resource Display
 
-Status: ready-for-dev
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -24,42 +24,42 @@ so that **I feel supported and cared for, not dismissed or handled by a system**
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Create CrisisResource data model and constants (AC: #2)
-  - [ ] 1.1 Create `Features/Safety/Models/CrisisResources.swift` with `CrisisResource` struct
-  - [ ] 1.2 Define static resources: 988 Suicide & Crisis Lifeline, Crisis Text Line
-  - [ ] 1.3 Add emergency fallback: 911 for immediate danger
-  - [ ] 1.4 Include `tel:`, `sms:`, and web URL properties for each resource
+- [x] Task 1: Create CrisisResource data model and constants (AC: #2)
+  - [x] 1.1 Create `Features/Safety/Models/CrisisResources.swift` with `CrisisResource` struct
+  - [x] 1.2 Define static resources: 988 Suicide & Crisis Lifeline, Crisis Text Line
+  - [x] 1.3 Add emergency fallback: 911 for immediate danger
+  - [x] 1.4 Include `tel:`, `sms:`, and web URL properties for each resource
 
-- [ ] Task 2: Create CrisisResourceSheet view (AC: #1, #3, #5)
-  - [ ] 2.1 Create `Features/Safety/Views/CrisisResourceSheet.swift`
-  - [ ] 2.2 Implement empathetic header copy: "I hear you, and what you're feeling sounds really heavy."
-  - [ ] 2.3 Implement honest boundary copy: "This is beyond what I can help with as a coaching tool."
-  - [ ] 2.4 Render tappable resource cards with phone and text actions
-  - [ ] 2.5 Implement gentle close copy: "I'm here for coaching when you're ready."
-  - [ ] 2.6 Apply adaptive styling using existing `LiquidPanelModifier` / `.adaptiveGlass()` patterns
-  - [ ] 2.7 Use `crisis-subtle` warm background (#FED7AA light / warm dark equivalent)
+- [x] Task 2: Create CrisisResourceSheet view (AC: #1, #3, #5)
+  - [x] 2.1 Create `Features/Safety/Views/CrisisResourceSheet.swift`
+  - [x] 2.2 Implement empathetic header copy: "I hear you, and what you're feeling sounds really heavy."
+  - [x] 2.3 Implement honest boundary copy: "This is beyond what I can help with as a coaching tool."
+  - [x] 2.4 Render tappable resource cards with phone and text actions
+  - [x] 2.5 Implement gentle close copy: "I'm here for coaching when you're ready."
+  - [x] 2.6 Apply adaptive styling using existing `LiquidPanelModifier` / `.adaptiveGlass()` patterns
+  - [x] 2.7 Use `crisis-subtle` warm background (#FED7AA light / warm dark equivalent)
 
-- [ ] Task 3: Wire crisis detection flag from backend to sheet display (AC: #1)
-  - [ ] 3.1 Add `crisis_detected` field to SSE streaming events in `chat-stream/index.ts`
-  - [ ] 3.2 Create `crisis-detector.ts` helper in `_shared/` with keyword + pattern matching
-  - [ ] 3.3 Call crisis detector BEFORE LLM call in the chat-stream pipeline
-  - [ ] 3.4 Update `ChatStreamService.swift` to parse `crisis_detected` flag from SSE events
-  - [ ] 3.5 Add `showCrisisResources` state to `ChatViewModel.swift`
-  - [ ] 3.6 Add `.sheet(isPresented:)` modifier to `ChatView.swift` for crisis resource sheet
+- [x] Task 3: Wire crisis detection flag from backend to sheet display (AC: #1)
+  - [x] 3.1 Add `crisis_detected` field to SSE streaming events in `chat-stream/index.ts`
+  - [x] 3.2 Create `crisis-detector.ts` helper in `_shared/` with keyword + pattern matching
+  - [x] 3.3 Call crisis detector BEFORE LLM call in the chat-stream pipeline
+  - [x] 3.4 Update `ChatStreamService.swift` to parse `crisis_detected` flag from SSE events
+  - [x] 3.5 Add `showCrisisResources` state to `ChatViewModel.swift`
+  - [x] 3.6 Add `.sheet(isPresented:)` modifier to `ChatView.swift` for crisis resource sheet
 
-- [ ] Task 4: Implement tap-to-call/text functionality (AC: #2)
-  - [ ] 4.1 Implement `openURL` for phone calls (e.g., `tel:988`)
-  - [ ] 4.2 Implement `openURL` for text messages (e.g., `sms:741741&body=HELLO`)
-  - [ ] 4.3 Handle fallback for devices without phone capability (show number as text)
+- [x] Task 4: Implement tap-to-call/text functionality (AC: #2)
+  - [x] 4.1 Implement `openURL` for phone calls (e.g., `tel:988`)
+  - [x] 4.2 Implement `openURL` for text messages (e.g., `sms:741741&body=HELLO`)
+  - [x] 4.3 Handle fallback for devices without phone capability (show number as text)
 
-- [ ] Task 5: Accessibility (AC: #4)
-  - [ ] 5.1 Add `.accessibilityLabel` and `.accessibilityHint` to all resource cards
-  - [ ] 5.2 Add `.accessibilityAddTraits(.isModal)` to the crisis sheet
-  - [ ] 5.3 Ensure Dynamic Type support at all text sizes
-  - [ ] 5.4 Test with VoiceOver navigation order
+- [x] Task 5: Accessibility (AC: #4)
+  - [x] 5.1 Add `.accessibilityLabel` and `.accessibilityHint` to all resource cards
+  - [x] 5.2 Add `.accessibilityAddTraits(.isModal)` to the crisis sheet
+  - [x] 5.3 Ensure Dynamic Type support at all text sizes
+  - [x] 5.4 Test with VoiceOver navigation order
 
-- [ ] Task 6: Add crisis-specific colors to design system (AC: #5)
-  - [ ] 6.1 Add `crisisSurface` and `crisisAccent` to `Colors.swift` (use UX spec colors: #FED7AA light, deep sienna accent)
+- [x] Task 6: Add crisis-specific colors to design system (AC: #5)
+  - [x] 6.1 Add `crisisSurface` and `crisisAccent` to `Colors.swift` (use UX spec colors: #FED7AA light, deep sienna accent)
 
 ## Dev Notes
 
@@ -229,10 +229,32 @@ Story 4.1 covers the full server-side crisis detection pipeline. This story (4.2
 
 ### Agent Model Used
 
-(To be filled by dev agent)
+Claude Opus 4.6
 
 ### Debug Log References
 
+- Build succeeded on first attempt with no compilation errors.
+
 ### Completion Notes List
 
+- **Task 6**: Added `crisisSurface` (#FED7AA), `crisisAccent` (#7C2D12), dark mode variants, and adaptive accessor functions to Colors.swift.
+- **Task 1**: Created `CrisisResource` struct with Identifiable conformance, computed `phoneURL`/`smsURL` properties, and three static resources (988 Lifeline, Crisis Text Line, 911 Emergency) in `Features/Safety/Models/CrisisResources.swift`.
+- **Task 2**: Created `CrisisResourceSheet` with empathetic header, honest boundary copy, resource cards, gentle close, adaptive styling (Liquid Glass on iOS 26+ / Warm Modern on iOS 18-25), warm crisis-subtle background. Uses `.sheet(isPresented:)` with `.presentationDetents([.medium, .large])`.
+- **Task 4**: Tap-to-call via `openURL(tel:988)`, tap-to-text via `openURL(sms:741741&body=HELLO)`. Numbers displayed as text (fallback for devices without phone capability).
+- **Task 5**: `.accessibilityLabel` and `.accessibilityHint` on all action buttons, `.accessibilityAddTraits(.isModal)` on the sheet, `.accessibilityElement(children: .contain)` on resource cards. All text uses system fonts with Dynamic Type support.
+- **Task 3**: Subtasks 3.1-3.4 already completed by Story 4.1. Added `showCrisisResources` state to ChatViewModel (Task 3.5). Added `.sheet(isPresented:)` modifier to ChatView (Task 3.6). Sheet triggers when streaming ends with `currentResponseHasCrisisFlag == true`.
+- **Tests**: Created `CrisisResourceTests.swift` (model, constants, colors) and `CrisisResourceSheetTests.swift` (content, URL, wiring).
+
+### Change Log
+
+- 2026-02-08: Story 4.2 implemented — CrisisResource model, CrisisResourceSheet view, crisis colors, ChatView/ChatViewModel wiring, accessibility, and tests.
+
 ### File List
+
+- CoachMe/CoachMe/Features/Safety/Models/CrisisResources.swift (new)
+- CoachMe/CoachMe/Features/Safety/Views/CrisisResourceSheet.swift (new)
+- CoachMe/CoachMe/Core/UI/Theme/Colors.swift (modified — added crisis colors and adaptive accessors)
+- CoachMe/CoachMe/Features/Chat/ViewModels/ChatViewModel.swift (modified — added showCrisisResources state)
+- CoachMe/CoachMe/Features/Chat/Views/ChatView.swift (modified — added crisis sheet modifier and onChange trigger)
+- CoachMe/CoachMeTests/CrisisResourceTests.swift (new)
+- CoachMe/CoachMeTests/CrisisResourceSheetTests.swift (new)

@@ -23,6 +23,7 @@ export interface DomainConfig {
   domainKeywords: string[];
   focusAreas: string[];
   enabled: boolean;
+  guardrails?: string;
 }
 
 // MARK: - Hardcoded general fallback (used only if general.json is missing)

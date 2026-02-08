@@ -372,3 +372,113 @@ struct ChatViewModelConversationSwitchingTests {
         #expect(!viewModel.isLoading)
     }
 }
+
+// MARK: - Story 4.1: Crisis Flag Tracking Tests
+
+@MainActor
+struct ChatViewModelCrisisFlagTests {
+
+    @Test("currentResponseHasCrisisFlag initializes to false")
+    func testCrisisFlagInitialState() {
+        let viewModel = ChatViewModel()
+
+        #expect(!viewModel.currentResponseHasCrisisFlag)
+    }
+
+    @Test("currentResponseHasCrisisFlag is reset on startNewConversation")
+    func testCrisisFlagResetOnNewConversation() {
+        let viewModel = ChatViewModel()
+
+        // Simulate crisis flag being set
+        viewModel.currentResponseHasCrisisFlag = true
+        #expect(viewModel.currentResponseHasCrisisFlag == true)
+
+        // When: starting new conversation
+        viewModel.startNewConversation()
+
+        // Then: crisis flag is reset
+        #expect(viewModel.currentResponseHasCrisisFlag == false)
+    }
+
+    @Test("currentResponseHasCrisisFlag is reset on loadConversation")
+    func testCrisisFlagResetOnLoadConversation() async {
+        let mockService = MockConversationService()
+        let viewModel = ChatViewModel(conversationService: mockService)
+
+        // Simulate crisis flag being set
+        viewModel.currentResponseHasCrisisFlag = true
+
+        // When: loading a different conversation
+        await viewModel.loadConversation(id: UUID())
+
+        // Then: crisis flag is reset
+        #expect(viewModel.currentResponseHasCrisisFlag == false)
+    }
+
+    @Test("currentResponseHasCrisisFlag is reset on sendMessage")
+    func testCrisisFlagResetOnSendMessage() async {
+        let viewModel = ChatViewModel()
+
+        // Simulate crisis flag being set from previous response
+        viewModel.currentResponseHasCrisisFlag = true
+        viewModel.inputText = "Hello"
+
+        // When: sending a new message
+        let task = Task {
+            await viewModel.sendMessage()
+        }
+
+        try? await Task.sleep(nanoseconds: 100_000_000)
+
+        // Then: crisis flag is reset for the new response
+        #expect(viewModel.currentResponseHasCrisisFlag == false)
+
+        task.cancel()
+    }
+}
+
+// MARK: - Story 4.5: Context Continuity After Crisis Tests
+
+@MainActor
+struct ChatViewModelCrisisContinuityTests {
+
+    @Test("startNewConversation resets ALL crisis state including showCrisisResources (Story 4.5, Test 6.1)")
+    func testStartNewConversationResetsAllCrisisState() {
+        let viewModel = ChatViewModel()
+
+        // Given: Crisis state from previous conversation
+        viewModel.currentResponseHasCrisisFlag = true
+        viewModel.showCrisisResources = true
+
+        // When: Starting a new conversation
+        viewModel.startNewConversation()
+
+        // Then: All crisis state is reset
+        #expect(viewModel.currentResponseHasCrisisFlag == false)
+        #expect(viewModel.showCrisisResources == false)
+    }
+
+    @Test("loadConversation resets ALL crisis state including showCrisisResources (Story 4.5, Test 6.2)")
+    func testLoadConversationResetsAllCrisisState() async {
+        let mockService = MockConversationService()
+        let viewModel = ChatViewModel(conversationService: mockService)
+
+        // Given: Crisis state from previous conversation
+        viewModel.currentResponseHasCrisisFlag = true
+        viewModel.showCrisisResources = true
+
+        // When: Loading a different conversation (post-crisis return)
+        await viewModel.loadConversation(id: UUID())
+
+        // Then: All crisis state is reset — no lingering crisis UI
+        #expect(viewModel.currentResponseHasCrisisFlag == false)
+        #expect(viewModel.showCrisisResources == false)
+    }
+
+    @Test("showCrisisResources initializes to false (Story 4.5)")
+    func testShowCrisisResourcesInitialState() {
+        let viewModel = ChatViewModel()
+
+        #expect(viewModel.showCrisisResources == false)
+    }
+}

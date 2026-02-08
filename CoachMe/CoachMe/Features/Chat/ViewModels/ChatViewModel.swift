@@ -6,6 +6,7 @@
 //
 //  Story 2.4: Updated to track memory moments from streaming responses (AC #4)
 //  Story 3.4: Updated to track pattern insights from streaming responses
+//  Story 4.1: Updated to track crisis detection flag from streaming responses
 //
 
 import Foundation
@@ -43,6 +44,14 @@ final class ChatViewModel {
 
     /// Story 3.4: Whether the current streaming response contains pattern insights
     var currentResponseHasPatternInsights = false
+
+    /// Story 4.1: Whether the current streaming response has a crisis detection flag
+    /// Consumed by Story 4.2 (CrisisResourceSheet) to present crisis resources
+    var currentResponseHasCrisisFlag = false
+
+    /// Story 4.2: Controls presentation of the crisis resource sheet
+    /// Set when streaming ends with crisis flag; dismissed by user
+    var showCrisisResources = false
 
     /// Current error (if any)
     var error: ChatError?
@@ -142,6 +151,7 @@ final class ChatViewModel {
         streamingContent = ""
         currentResponseHasMemoryMoments = false  // Story 2.4: Reset memory moment tracking
         currentResponseHasPatternInsights = false  // Story 3.4: Reset pattern insight tracking
+        currentResponseHasCrisisFlag = false  // Story 4.1: Reset crisis flag tracking
         showError = false
         tokenBuffer?.reset()
 
@@ -175,7 +185,7 @@ final class ChatViewModel {
                     try Task.checkCancellation()
 
                     switch event {
-                    case .token(let content, let hasMemoryMoment, let hasPatternInsight):
+                    case .token(let content, let hasMemoryMoment, let hasPatternInsight, let hasCrisisFlag):
                         tokenBuffer?.addToken(content)
                         // Story 2.4: Track if response contains memory moments (AC #4)
                         if hasMemoryMoment {
@@ -184,6 +194,10 @@ final class ChatViewModel {
                         // Story 3.4: Track if response contains pattern insights
                         if hasPatternInsight {
                             currentResponseHasPatternInsights = true
+                        }
+                        // Story 4.1: Track if crisis was detected in user message
+                        if hasCrisisFlag {
+                            currentResponseHasCrisisFlag = true
                         }
 
                     case .done(let messageId, _):
@@ -353,6 +367,8 @@ final class ChatViewModel {
         isStreaming = false
         currentResponseHasMemoryMoments = false  // Story 2.4: Reset memory moment tracking
         currentResponseHasPatternInsights = false  // Story 3.4: Reset pattern insight tracking
+        currentResponseHasCrisisFlag = false  // Story 4.1: Reset crisis flag tracking
+        showCrisisResources = false  // Story 4.5: Dismiss any lingering crisis sheet
         tokenBuffer?.reset()
         lastUserMessageContent = nil
         failedUserMessageIDs.removeAll()
@@ -375,6 +391,8 @@ final class ChatViewModel {
         isStreaming = false
         currentResponseHasMemoryMoments = false
         currentResponseHasPatternInsights = false
+        currentResponseHasCrisisFlag = false  // Story 4.1: Reset crisis flag tracking
+        showCrisisResources = false  // Story 4.5: Dismiss any lingering crisis sheet
         tokenBuffer?.reset()
         lastUserMessageContent = nil
         failedUserMessageIDs.removeAll()

@@ -1,6 +1,6 @@
 # Story 4.4: Tone Guardrails & Clinical Boundaries
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -26,30 +26,30 @@ so that **I never feel judged, dismissed, or given medical advice that could be 
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1: Expand System Prompt with Tone Guardrails** (AC: #1, #5)
-  - [ ] 1.1 Add `TONE_GUARDRAILS_INSTRUCTION` constant to `prompt-builder.ts` with comprehensive anti-tone and positive-tone directives
-  - [ ] 1.2 Add `CLINICAL_BOUNDARY_INSTRUCTION` constant to `prompt-builder.ts` with specific boundary rules (no diagnose, no prescribe, no claim expertise)
-  - [ ] 1.3 Inject both instructions into `buildCoachingPrompt()` after BASE_COACHING_PROMPT and before domain-specific sections
-  - [ ] 1.4 Include explicit boundary reframe pattern: Empathize → Boundary → Redirect → Door Open
+- [x] **Task 1: Expand System Prompt with Tone Guardrails** (AC: #1, #5)
+  - [x] 1.1 Add `TONE_GUARDRAILS_INSTRUCTION` constant to `prompt-builder.ts` with comprehensive anti-tone and positive-tone directives
+  - [x] 1.2 Add `CLINICAL_BOUNDARY_INSTRUCTION` constant to `prompt-builder.ts` with specific boundary rules (no diagnose, no prescribe, no claim expertise)
+  - [x] 1.3 Inject both instructions into `buildCoachingPrompt()` after BASE_COACHING_PROMPT and before domain-specific sections
+  - [x] 1.4 Include explicit boundary reframe pattern: Empathize → Boundary → Redirect → Door Open
 
-- [ ] **Task 2: Add Domain-Specific Guardrail Context** (AC: #4, #5)
-  - [ ] 2.1 Add `guardrails` field to each domain config JSON file with domain-specific clinical boundaries (e.g., fitness: no nutrition/medical advice, mindset: no psychiatric labeling, relationships: no couples therapy scope)
-  - [ ] 2.2 Update `DomainConfig` interface in `domain-configs.ts` to include optional `guardrails` field
-  - [ ] 2.3 Update `buildCoachingPrompt()` to append domain-specific guardrails to the system prompt when present
+- [x] **Task 2: Add Domain-Specific Guardrail Context** (AC: #4, #5)
+  - [x] 2.1 Add `guardrails` field to each domain config JSON file with domain-specific clinical boundaries (e.g., fitness: no nutrition/medical advice, mindset: no psychiatric labeling, relationships: no couples therapy scope)
+  - [x] 2.2 Update `DomainConfig` interface in `domain-configs.ts` to include optional `guardrails` field
+  - [x] 2.3 Update `buildCoachingPrompt()` to append domain-specific guardrails to the system prompt when present
 
-- [ ] **Task 3: Add Comprehensive Tests** (AC: #6)
-  - [ ] 3.1 Add test: "includes TONE_GUARDRAILS_INSTRUCTION in all prompts"
-  - [ ] 3.2 Add test: "includes CLINICAL_BOUNDARY_INSTRUCTION in all prompts"
-  - [ ] 3.3 Add test: "guardrails prohibit dismissive, sarcastic, harsh tones"
-  - [ ] 3.4 Add test: "guardrails prohibit diagnosis, prescription, clinical expertise claims"
-  - [ ] 3.5 Add test: "guardrails include warm boundary reframe pattern"
-  - [ ] 3.6 Add test: "domain-specific guardrails appended when present in config"
-  - [ ] 3.7 Add test: "crisis instructions include specific resource information (988, Crisis Text Line)"
+- [x] **Task 3: Add Comprehensive Tests** (AC: #6)
+  - [x] 3.1 Add test: "includes TONE_GUARDRAILS_INSTRUCTION in all prompts"
+  - [x] 3.2 Add test: "includes CLINICAL_BOUNDARY_INSTRUCTION in all prompts"
+  - [x] 3.3 Add test: "guardrails prohibit dismissive, sarcastic, harsh tones"
+  - [x] 3.4 Add test: "guardrails prohibit diagnosis, prescription, clinical expertise claims"
+  - [x] 3.5 Add test: "guardrails include warm boundary reframe pattern"
+  - [x] 3.6 Add test: "domain-specific guardrails appended when present in config"
+  - [x] 3.7 Add test: "crisis instructions include specific resource information (988, Crisis Text Line)"
 
-- [ ] **Task 4: Verify Integration with Existing Pipeline** (AC: #1, #2, #3, #4)
-  - [ ] 4.1 Verify guardrails don't conflict with existing PATTERN_TAG_INSTRUCTION
-  - [ ] 4.2 Verify guardrails don't conflict with MEMORY_TAG_INSTRUCTION
-  - [ ] 4.3 Verify guardrails work across all 8 domain configs
+- [x] **Task 4: Verify Integration with Existing Pipeline** (AC: #1, #2, #3, #4)
+  - [x] 4.1 Verify guardrails don't conflict with existing PATTERN_TAG_INSTRUCTION
+  - [x] 4.2 Verify guardrails don't conflict with MEMORY_TAG_INSTRUCTION
+  - [x] 4.3 Verify guardrails work across all 8 domain configs
   - [ ] 4.4 Manual testing: send provocative/clinical messages and verify response tone (user will test)
 
 ## Dev Notes
@@ -271,10 +271,33 @@ deno test prompt-builder.test.ts
 
 ### Agent Model Used
 
-{{agent_model_name_version}}
+Claude Opus 4.6
 
 ### Debug Log References
 
+No issues encountered. All implementation followed established patterns from Stories 3.1-3.5.
+
 ### Completion Notes List
 
+- ✅ Task 1: Added `TONE_GUARDRAILS_INSTRUCTION` constant with 5 anti-tone directives (dismissive, sarcastic, harsh, patronizing, cold) and 6 positive-tone directives. Added `CLINICAL_BOUNDARY_INSTRUCTION` constant with 5 clinical prohibitions and the BOUNDARY REFRAME PATTERN (Empathize → Boundary → Redirect → Door Open) with 4 concrete scenario examples. Both injected into `buildCoachingPrompt()` after BASE_COACHING_PROMPT and before domain-specific sections.
+- ✅ Task 2: Added optional `guardrails?: string` field to `DomainConfig` interface. Added domain-specific guardrails to all 8 JSON config files (general has empty guardrails; 7 specialized domains have targeted clinical boundaries). Updated `buildCoachingPrompt()` to append domain-specific guardrails when present.
+- ✅ Task 3: Added 15 new tests to `prompt-builder.test.ts` covering tone guardrails presence, clinical boundary prohibitions, boundary reframe pattern, domain-specific guardrails, crisis resource information, coexistence with PATTERN_TAG and MEMORY_TAG instructions, cross-domain verification, and positive tone directives.
+- ✅ Task 4: Verified prompt construction order is correct. Guardrails inject after BASE_COACHING_PROMPT and before domain config. No conflicts with PATTERN_TAG_INSTRUCTION or MEMORY_TAG_INSTRUCTION. All 8 domains verified. Task 4.4 (manual testing) deferred to user.
+
+### Change Log
+
+- 2026-02-08: Story 4.4 implementation complete — tone guardrails, clinical boundaries, domain-specific guardrails, and comprehensive tests added
+
 ### File List
+
+- CoachMe/Supabase/supabase/functions/_shared/prompt-builder.ts (modified — added TONE_GUARDRAILS_INSTRUCTION, CLINICAL_BOUNDARY_INSTRUCTION constants and injection into buildCoachingPrompt)
+- CoachMe/Supabase/supabase/functions/_shared/domain-configs.ts (modified — added optional guardrails field to DomainConfig interface)
+- CoachMe/Supabase/supabase/functions/_shared/domain-configs/general.json (modified — added empty guardrails field)
+- CoachMe/Supabase/supabase/functions/_shared/domain-configs/life.json (modified — added domain-specific guardrails)
+- CoachMe/Supabase/supabase/functions/_shared/domain-configs/career.json (modified — added domain-specific guardrails)
+- CoachMe/Supabase/supabase/functions/_shared/domain-configs/relationships.json (modified — added domain-specific guardrails)
+- CoachMe/Supabase/supabase/functions/_shared/domain-configs/mindset.json (modified — added domain-specific guardrails)
+- CoachMe/Supabase/supabase/functions/_shared/domain-configs/creativity.json (modified — added domain-specific guardrails)
+- CoachMe/Supabase/supabase/functions/_shared/domain-configs/fitness.json (modified — added domain-specific guardrails)
+- CoachMe/Supabase/supabase/functions/_shared/domain-configs/leadership.json (modified — added domain-specific guardrails)
+- CoachMe/Supabase/supabase/functions/_shared/prompt-builder.test.ts (modified — added 15 new Story 4.4 tests)

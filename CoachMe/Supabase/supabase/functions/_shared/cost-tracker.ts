@@ -14,6 +14,7 @@ export async function logUsage(
     promptTokens: number;
     completionTokens: number;
     costUsd: number;
+    crisisDetected?: boolean;  // Story 4.1: Crisis detection flag for monitoring
   }
 ): Promise<void> {
   const { error } = await supabase.from('usage_logs').insert({
@@ -24,6 +25,7 @@ export async function logUsage(
     tokens_in: data.promptTokens,
     tokens_out: data.completionTokens,
     cost_usd: data.costUsd,
+    crisis_detected: data.crisisDetected ?? false,  // Story 4.1
     created_at: new Date().toISOString(),
   });
 

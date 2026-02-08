@@ -88,6 +88,10 @@ interface ContextProfileRow {
 /**
  * Load user context from database
  *
+ * STORY 4.5 — CRISIS NEUTRALITY: This function loads the full context profile
+ * regardless of crisis history. No degradation or filtering based on past crisis
+ * conversations. The user's values, goals, and situation remain fully intact.
+ *
  * @param supabase - Supabase client with user auth
  * @param userId - User ID to load context for
  * @returns UserContext with values, goals, situation, and confirmed insights
@@ -240,6 +244,12 @@ export function formatContextForPrompt(context: UserContext): {
 
 /**
  * Load relevant conversation history for cross-session references
+ *
+ * STORY 4.5 — CRISIS NEUTRALITY (deliberate design decision):
+ * This query intentionally does NOT filter on crisis_detected or any
+ * crisis-related metadata. Crisis conversations MUST appear in history
+ * like any other conversation. The user deserves context continuity
+ * regardless of what was discussed previously. Do NOT add crisis filtering here.
  *
  * @param supabase - Supabase client with user auth
  * @param userId - User ID to load history for

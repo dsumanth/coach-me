@@ -132,6 +132,20 @@ extension Color {
     /// Leadership coaching dark - brighter gold
     static let domainLeadershipDark = Color(red: 205/255, green: 155/255, blue: 65/255)
 
+    // MARK: - Crisis Colors (Story 4.2 — warm, NOT red/error)
+
+    /// Crisis surface — warm peach-orange (#FED7AA) per UX spec
+    static let crisisSurface = Color(red: 254/255, green: 215/255, blue: 170/255)
+
+    /// Crisis accent — deep sienna (#7C2D12) per UX spec
+    static let crisisAccent = Color(red: 124/255, green: 45/255, blue: 18/255)
+
+    /// Crisis surface dark — warm amber-tinged dark surface
+    static let crisisSurfaceDark = Color(red: 58/255, green: 42/255, blue: 28/255)
+
+    /// Crisis accent dark — brighter sienna for dark mode contrast
+    static let crisisAccentDark = Color(red: 217/255, green: 119/255, blue: 60/255)
+
     // MARK: - Dark Mode Surface Colors
 
     /// Light surface in dark mode
@@ -177,5 +191,15 @@ extension Color {
         } else {
             return isPrimary ? warmGray900 : warmGray600
         }
+    }
+
+    /// Returns crisis surface color adjusted for color scheme (Story 4.2)
+    static func adaptiveCrisisSurface(_ colorScheme: ColorScheme) -> Color {
+        colorScheme == .dark ? crisisSurfaceDark : crisisSurface
+    }
+
+    /// Returns crisis accent color adjusted for color scheme (Story 4.2)
+    static func adaptiveCrisisAccent(_ colorScheme: ColorScheme) -> Color {
+        colorScheme == .dark ? crisisAccentDark : crisisAccent
     }
 }

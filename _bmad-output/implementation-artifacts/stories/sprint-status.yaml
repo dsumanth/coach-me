@@ -64,23 +64,23 @@ development_status:
   epic-2-retrospective: optional
 
   # ── Epic 3: Intelligent Domain Routing & Pattern Recognition (7 stories) ──
-  epic-3: in-progress
-  3-1-invisible-domain-routing: review
-  3-2-domain-configuration-engine: review
-  3-3-cross-session-memory-references: review
-  3-4-pattern-recognition-across-conversations: review
-  3-5-cross-domain-pattern-synthesis: review
-  3-6-multiple-conversation-threads: review
-  3-7-conversation-history-view: review
+  epic-3: done
+  3-1-invisible-domain-routing: done
+  3-2-domain-configuration-engine: done
+  3-3-cross-session-memory-references: done
+  3-4-pattern-recognition-across-conversations: done
+  3-5-cross-domain-pattern-synthesis: done
+  3-6-multiple-conversation-threads: done
+  3-7-conversation-history-view: done
   epic-3-retrospective: optional
 
   # ── Epic 4: Coaching Safety & Crisis Handling (5 stories) ──
   epic-4: in-progress
-  4-1-crisis-detection-pipeline: ready-for-dev
-  4-2-crisis-resource-display: ready-for-dev
-  4-3-coaching-disclaimers: ready-for-dev
-  4-4-tone-guardrails-and-clinical-boundaries: ready-for-dev
-  4-5-context-continuity-after-crisis: ready-for-dev
+  4-1-crisis-detection-pipeline: done
+  4-2-crisis-resource-display: done
+  4-3-coaching-disclaimers: done
+  4-4-tone-guardrails-and-clinical-boundaries: review
+  4-5-context-continuity-after-crisis: review
   epic-4-retrospective: optional
 
   # ── Epic 5: Creator Tools & Sharing (4 stories) ──

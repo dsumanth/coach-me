@@ -1,6 +1,6 @@
 # Story 4.3: Coaching Disclaimers
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 
@@ -18,24 +18,24 @@ so that **I have appropriate expectations and the product maintains proper liabi
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Create Features/Safety/ directory structure (AC: #1, #3)
-  - [ ] 1.1 Create `Features/Safety/Views/` directory
-  - [ ] 1.2 Create `DisclaimerView.swift` — reusable disclaimer component showing "AI coaching, not therapy or mental health treatment" text with Terms of Service link
-  - [ ] 1.3 Include full accessibility labels (`accessibilityLabel`, `accessibilityHint` on link)
-- [ ] Task 2: Add Legal/About section to SettingsView (AC: #3, #4)
-  - [ ] 2.1 Add a new "About" or "Legal" section below the Account section in `SettingsView.swift`
-  - [ ] 2.2 Include inline disclaimer text: "AI coaching, not therapy or mental health treatment"
-  - [ ] 2.3 Add "Terms of Service" row that opens `https://coachme.app/terms` via `Link` (same URL as WelcomeView)
-  - [ ] 2.4 Add "Privacy Policy" row that opens `https://coachme.app/privacy` via `Link`
-  - [ ] 2.5 Apply `.adaptiveGlass()` styling consistent with existing sections
-  - [ ] 2.6 Use `Color.terracotta` for link text per existing WelcomeView pattern
-- [ ] Task 3: Verify WelcomeView disclaimer completeness (AC: #1, #2)
-  - [ ] 3.1 Confirm existing `disclaimerSection` in WelcomeView.swift meets FR19 requirements — already has "AI coaching, not therapy or mental health treatment" text + Terms of Service link (lines 117-133)
-  - [ ] 3.2 No changes needed if verification passes; document as pre-existing from Epic 1
-- [ ] Task 4: Write tests (AC: #1-#5)
-  - [ ] 4.1 Test DisclaimerView renders disclaimer text and link
-  - [ ] 4.2 Test SettingsView contains legal section with Terms of Service and Privacy Policy links
-  - [ ] 4.3 Test accessibility labels present on all disclaimer content
+- [x] Task 1: Create Features/Safety/ directory structure (AC: #1, #3)
+  - [x] 1.1 Create `Features/Safety/Views/` directory
+  - [x] 1.2 Create `DisclaimerView.swift` — reusable disclaimer component showing "AI coaching, not therapy or mental health treatment" text with Terms of Service link
+  - [x] 1.3 Include full accessibility labels (`accessibilityLabel`, `accessibilityHint` on link)
+- [x] Task 2: Add Legal/About section to SettingsView (AC: #3, #4)
+  - [x] 2.1 Add a new "About" or "Legal" section below the Account section in `SettingsView.swift`
+  - [x] 2.2 Include inline disclaimer text: "AI coaching, not therapy or mental health treatment"
+  - [x] 2.3 Add "Terms of Service" row that opens `https://coachme.app/terms` via `Link` (same URL as WelcomeView)
+  - [x] 2.4 Add "Privacy Policy" row that opens `https://coachme.app/privacy` via `Link`
+  - [x] 2.5 Apply `.adaptiveGlass()` styling consistent with existing sections
+  - [x] 2.6 Use `Color.adaptiveTerracotta(colorScheme)` for link text (adaptive version, consistent with SettingsView pattern)
+- [x] Task 3: Verify WelcomeView disclaimer completeness (AC: #1, #2)
+  - [x] 3.1 Confirm existing `disclaimerSection` in WelcomeView.swift meets FR19 requirements — already has "AI coaching, not therapy or mental health treatment" text + Terms of Service link (lines 117-133)
+  - [x] 3.2 No changes needed; documented as pre-existing from Epic 1. Updated URL to use shared AppURLs constant.
+- [x] Task 4: Write tests (AC: #1-#5)
+  - [x] 4.1 Test DisclaimerView renders disclaimer text and link
+  - [x] 4.2 Test SettingsView contains legal section with Terms of Service and Privacy Policy links
+  - [x] 4.3 Test accessibility labels present on all disclaimer content
 
 ## Dev Notes
 
@@ -177,10 +177,28 @@ Per project patterns:
 
 ### Agent Model Used
 
-{{agent_model_name_version}}
+Claude Opus 4.6
 
 ### Debug Log References
 
+- Build succeeded with zero errors on first attempt
+
 ### Completion Notes List
 
+- Created `DisclaimerView.swift` as a reusable coaching disclaimer component with `AppURLs` enum for shared URL constants
+- Added "About" legal section to `SettingsView.swift` with disclaimer text, Terms of Service link, and Privacy Policy link — all with `.adaptiveGlass()` styling and full VoiceOver accessibility
+- Updated `WelcomeView.swift` to reference shared `AppURLs.termsOfService` instead of private URL constant (eliminates duplication)
+- Verified existing WelcomeView disclaimer (Epic 1) already satisfies AC #1 and #2 — no changes needed
+- All AC (#1–#5) satisfied: welcome disclaimer, ToS link, Settings legal section, Safari opening via `Link`, and VoiceOver accessibility labels/hints
+- Tests written in `DisclaimerTests.swift` covering AppURLs validation, DisclaimerView instantiation, accessibility, and URL consistency
+
+### Change Log
+
+- 2026-02-08: Story 4.3 implementation complete — DisclaimerView, SettingsView legal section, shared AppURLs, tests
+
 ### File List
+
+- `CoachMe/CoachMe/Features/Safety/Views/DisclaimerView.swift` (new)
+- `CoachMe/CoachMe/Features/Settings/Views/SettingsView.swift` (modified — added legalSection)
+- `CoachMe/CoachMe/Features/Auth/Views/WelcomeView.swift` (modified — updated to use shared AppURLs)
+- `CoachMe/CoachMeTests/DisclaimerTests.swift` (new)

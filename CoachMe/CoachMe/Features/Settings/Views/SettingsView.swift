@@ -39,6 +39,9 @@ struct SettingsView: View {
 
                     // Account Section
                     accountSection
+
+                    // Legal / About Section (Story 4.3)
+                    legalSection
                 }
                 .padding(16)
             }
@@ -210,6 +213,67 @@ struct SettingsView: View {
                 }
                 .accessibilityLabel("Sign out")
                 .accessibilityHint("Signs you out of your account")
+            }
+            .adaptiveGlass()
+        }
+    }
+
+    /// Legal / About section with coaching disclaimer and links (Story 4.3)
+    private var legalSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("About")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(Color.adaptiveText(colorScheme, isPrimary: false))
+                .padding(.horizontal, 4)
+
+            VStack(spacing: 0) {
+                // Coaching disclaimer text
+                HStack {
+                    Text("AI coaching, not therapy or mental health treatment")
+                        .font(.caption)
+                        .foregroundStyle(Color.adaptiveText(colorScheme, isPrimary: false))
+                    Spacer()
+                }
+                .padding(16)
+                .accessibilityLabel("AI coaching, not therapy or mental health treatment")
+
+                Divider()
+                    .padding(.horizontal, 16)
+
+                // Terms of Service link
+                Link(destination: AppURLs.termsOfService) {
+                    HStack {
+                        Text("Terms of Service")
+                            .font(.body)
+                            .foregroundStyle(Color.adaptiveTerracotta(colorScheme))
+                        Spacer()
+                        Image(systemName: "arrow.up.right")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(Color.adaptiveText(colorScheme, isPrimary: false))
+                    }
+                    .padding(16)
+                }
+                .accessibilityLabel("Terms of Service")
+                .accessibilityHint("Opens the terms of service in Safari")
+
+                Divider()
+                    .padding(.horizontal, 16)
+
+                // Privacy Policy link
+                Link(destination: AppURLs.privacyPolicy) {
+                    HStack {
+                        Text("Privacy Policy")
+                            .font(.body)
+                            .foregroundStyle(Color.adaptiveTerracotta(colorScheme))
+                        Spacer()
+                        Image(systemName: "arrow.up.right")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(Color.adaptiveText(colorScheme, isPrimary: false))
+                    }
+                    .padding(16)
+                }
+                .accessibilityLabel("Privacy Policy")
+                .accessibilityHint("Opens the privacy policy in Safari")
             }
             .adaptiveGlass()
         }

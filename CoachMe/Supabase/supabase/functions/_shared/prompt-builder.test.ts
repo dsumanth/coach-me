@@ -668,3 +668,199 @@ Deno.test('buildCoachingPrompt - cross-domain section instructs max ONE pattern 
 
   assertStringIncludes(result, 'ONE');
 });
+
+// MARK: - Story 4.4: Tone Guardrails & Clinical Boundaries Tests
+
+Deno.test('buildCoachingPrompt - includes TONE_GUARDRAILS_INSTRUCTION in all prompts (Test 3.1)', () => {
+  const result = buildCoachingPrompt(null);
+
+  assertStringIncludes(result, 'TONE GUARDRAILS');
+  assertStringIncludes(result, 'warm, empathetic, and supportive');
+});
+
+Deno.test('buildCoachingPrompt - includes CLINICAL_BOUNDARY_INSTRUCTION in all prompts (Test 3.2)', () => {
+  const result = buildCoachingPrompt(null);
+
+  assertStringIncludes(result, 'CLINICAL BOUNDARIES');
+  assertStringIncludes(result, 'NOT a therapist, psychiatrist, or medical professional');
+});
+
+Deno.test('buildCoachingPrompt - guardrails prohibit dismissive, sarcastic, harsh tones (Test 3.3)', () => {
+  const result = buildCoachingPrompt(null);
+
+  assertStringIncludes(result, 'Dismissive');
+  assertStringIncludes(result, 'Sarcastic');
+  assertStringIncludes(result, 'Harsh or judgmental');
+  assertStringIncludes(result, 'Patronizing');
+  assertStringIncludes(result, 'Cold or robotic');
+});
+
+Deno.test('buildCoachingPrompt - guardrails prohibit diagnosis and clinical labeling (Test 3.4)', () => {
+  const result = buildCoachingPrompt(null);
+
+  assertStringIncludes(result, 'Diagnose conditions');
+  assertStringIncludes(result, 'Never say "You have anxiety/depression/ADHD"');
+  assertStringIncludes(result, 'Use clinical labels');
+});
+
+Deno.test('buildCoachingPrompt - guardrails prohibit medication/treatment prescription (Test 3.4)', () => {
+  const result = buildCoachingPrompt(null);
+
+  assertStringIncludes(result, 'Prescribe or recommend medication');
+  assertStringIncludes(result, 'Never suggest specific medications or treatments');
+});
+
+Deno.test('buildCoachingPrompt - guardrails prohibit claiming clinical expertise (Test 3.4)', () => {
+  const result = buildCoachingPrompt(null);
+
+  assertStringIncludes(result, 'Claim clinical expertise');
+});
+
+Deno.test('buildCoachingPrompt - guardrails include warm boundary reframe pattern (Test 3.5)', () => {
+  const result = buildCoachingPrompt(null);
+
+  assertStringIncludes(result, 'BOUNDARY REFRAME PATTERN');
+  assertStringIncludes(result, 'EMPATHIZE');
+  assertStringIncludes(result, 'BOUNDARY');
+  assertStringIncludes(result, 'REDIRECT');
+  assertStringIncludes(result, 'DOOR OPEN');
+});
+
+Deno.test('buildCoachingPrompt - domain-specific guardrails appended when present in config (Test 3.6)', () => {
+  // Fitness has guardrails about not giving medical/nutrition advice
+  const fitnessResult = buildCoachingPrompt(null, 'fitness');
+  assertStringIncludes(fitnessResult, 'Domain-specific boundaries:');
+  assertStringIncludes(fitnessResult, 'medical or nutrition advice');
+
+  // Career has guardrails about not diagnosing burnout as depression
+  const careerResult = buildCoachingPrompt(null, 'career');
+  assertStringIncludes(careerResult, 'Domain-specific boundaries:');
+  assertStringIncludes(careerResult, 'burnout as clinical depression');
+
+  // General has empty guardrails — should NOT include domain-specific line
+  const generalResult = buildCoachingPrompt(null, 'general');
+  assertEquals(generalResult.includes('Domain-specific boundaries:'), false);
+});
+
+Deno.test('buildCoachingPrompt - crisis instructions include specific resource information (Test 3.7)', () => {
+  const result = buildCoachingPrompt(null, 'general', false, [], [], true);
+
+  assertStringIncludes(result, '988 Suicide & Crisis Lifeline');
+  assertStringIncludes(result, 'call or text 988');
+  assertStringIncludes(result, 'Crisis Text Line');
+  assertStringIncludes(result, 'text HOME to 741741');
+});
+
+Deno.test('buildCoachingPrompt - tone guardrails present in ALL domains', () => {
+  const domains = ['life', 'career', 'relationships', 'mindset', 'creativity', 'fitness', 'leadership', 'general'] as const;
+  for (const domain of domains) {
+    const result = buildCoachingPrompt(null, domain);
+    assertStringIncludes(result, 'TONE GUARDRAILS');
+    assertStringIncludes(result, 'CLINICAL BOUNDARIES');
+  }
+});
+
+Deno.test('buildCoachingPrompt - guardrails do not conflict with PATTERN_TAG_INSTRUCTION', () => {
+  const result = buildCoachingPrompt(null, 'general', false, mockPastConversations);
+
+  // Both should be present without conflict
+  assertStringIncludes(result, 'TONE GUARDRAILS');
+  assertStringIncludes(result, 'CLINICAL BOUNDARIES');
+  assertStringIncludes(result, 'PATTERN RECOGNITION');
+});
+
+Deno.test('buildCoachingPrompt - guardrails do not conflict with MEMORY_TAG_INSTRUCTION', () => {
+  const result = buildCoachingPrompt(fullContext, 'general', false, mockPastConversations);
+
+  // All should be present without conflict
+  assertStringIncludes(result, 'TONE GUARDRAILS');
+  assertStringIncludes(result, 'CLINICAL BOUNDARIES');
+  assertStringIncludes(result, '[MEMORY:');
+  assertStringIncludes(result, 'wrap that specific reference');
+});
+
+Deno.test('buildCoachingPrompt - all non-general domains have domain-specific guardrails', () => {
+  const domainsWithGuardrails = ['life', 'career', 'relationships', 'mindset', 'creativity', 'fitness', 'leadership'] as const;
+  for (const domain of domainsWithGuardrails) {
+    const result = buildCoachingPrompt(null, domain);
+    assertStringIncludes(result, 'Domain-specific boundaries:');
+  }
+});
+
+Deno.test('buildCoachingPrompt - guardrails include positive tone directives', () => {
+  const result = buildCoachingPrompt(null);
+
+  assertStringIncludes(result, 'Warm and empathetic');
+  assertStringIncludes(result, 'Short responses with follow-up questions');
+  assertStringIncludes(result, 'Curious and inviting');
+});
+
+Deno.test('buildCoachingPrompt - boundary examples use coaching reframe approach', () => {
+  const result = buildCoachingPrompt(null);
+
+  // Verify concrete examples of correct boundary responses
+  assertStringIncludes(result, 'From a coaching angle');
+  assertStringIncludes(result, 'help you prepare for that conversation');
+  assertStringIncludes(result, "I'm here for coaching");
+});
+
+// MARK: - Story 4.5: Crisis Continuity After Crisis Tests
+
+Deno.test('buildCoachingPrompt - includes crisis continuity instruction (Story 4.5, Test 5.1)', () => {
+  const result = buildCoachingPrompt(null);
+
+  assertStringIncludes(result, 'welcome them back naturally');
+  assertStringIncludes(result, "Don't reference the previous crisis");
+});
+
+Deno.test('buildCoachingPrompt - crisis continuity present with context (Story 4.5, Test 5.2)', () => {
+  const result = buildCoachingPrompt(fullContext, 'career');
+
+  assertStringIncludes(result, 'welcome them back naturally');
+  assertStringIncludes(result, 'whole person, not a crisis case');
+});
+
+Deno.test('buildCoachingPrompt - crisis continuity present in ALL domains (Story 4.5)', () => {
+  const domains = ['life', 'career', 'relationships', 'mindset', 'creativity', 'fitness', 'leadership', 'general'] as const;
+  for (const domain of domains) {
+    const result = buildCoachingPrompt(null, domain);
+    assertStringIncludes(result, 'welcome them back naturally');
+  }
+});
+
+Deno.test('buildCoachingPrompt - crisis continuity does NOT include explicit crisis handling for return scenario (Story 4.5, Test 5.3)', () => {
+  // Build prompt with context and a crisis conversation in history
+  const crisisHistory: PastConversation[] = [
+    {
+      conversationId: 'conv-crisis',
+      title: 'Tough conversation',
+      domain: 'life',
+      summary: 'Life: Discussed feeling overwhelmed and hopeless',
+      lastMessageAt: '2026-02-07T10:00:00Z',
+    },
+  ];
+  const result = buildCoachingPrompt(fullContext, 'general', false, crisisHistory);
+
+  // Should include the continuity instruction (natural return)
+  assertStringIncludes(result, 'welcome them back naturally');
+  // Should NOT include the active CRISIS_PROMPT override (only present when crisisDetected=true)
+  assertEquals(result.includes('CRITICAL SAFETY OVERRIDE'), false);
+});
+
+Deno.test('buildCoachingPrompt - system prompt instructs natural return behavior (Story 4.5, Test 5.4)', () => {
+  const result = buildCoachingPrompt(null);
+
+  // Verify the instruction covers warm welcome and no dwelling
+  assertStringIncludes(result, 'welcome them back naturally');
+  assertStringIncludes(result, "Don't reference the previous crisis unless they bring it up first");
+  assertStringIncludes(result, 'Resume normal coaching with their full context');
+});
+
+Deno.test('buildCoachingPrompt - BASE_COACHING_PROMPT references dedicated safety system instead of LLM inference (Story 4.5)', () => {
+  const result = buildCoachingPrompt(null);
+
+  // Should reference the dedicated crisis detection system
+  assertStringIncludes(result, 'dedicated safety system');
+  // Should NOT contain old LLM-inference crisis guidance
+  assertEquals(result.includes('If users mention crisis indicators (self-harm, suicide)'), false);
+});

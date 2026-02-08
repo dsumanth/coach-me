@@ -4,6 +4,7 @@
 //
 //  Created by Dev Agent on 2/6/26.
 //  Story 3.4: Extended with pattern_insight flag decoding tests
+//  Story 4.1: Extended with crisis_detected flag decoding tests
 //
 
 import Testing
@@ -25,7 +26,7 @@ struct ChatStreamServiceTests {
 
         let event = try JSONDecoder().decode(ChatStreamService.StreamEvent.self, from: data)
 
-        if case .token(let content, let hasMemoryMoment, let hasPatternInsight) = event {
+        if case .token(let content, let hasMemoryMoment, let hasPatternInsight, let hasCrisisFlag) = event {
             #expect(content == "Hello")
             #expect(hasMemoryMoment == false)  // Default when not present
             #expect(hasPatternInsight == false)  // Story 3.4: Default when not present
@@ -44,7 +45,7 @@ struct ChatStreamServiceTests {
 
         let event = try JSONDecoder().decode(ChatStreamService.StreamEvent.self, from: data)
 
-        if case .token(let content, let hasMemoryMoment, let hasPatternInsight) = event {
+        if case .token(let content, let hasMemoryMoment, let hasPatternInsight, let hasCrisisFlag) = event {
             #expect(content == "I value [MEMORY: honesty]")
             #expect(hasMemoryMoment == true)
             #expect(hasPatternInsight == false)  // Story 3.4: Not a pattern insight
@@ -62,7 +63,7 @@ struct ChatStreamServiceTests {
 
         let event = try JSONDecoder().decode(ChatStreamService.StreamEvent.self, from: data)
 
-        if case .token(let content, let hasMemoryMoment, let hasPatternInsight) = event {
+        if case .token(let content, let hasMemoryMoment, let hasPatternInsight, let hasCrisisFlag) = event {
             #expect(content == "Regular content")
             #expect(hasMemoryMoment == false)
             #expect(hasPatternInsight == false)
@@ -218,7 +219,7 @@ struct ChatStreamServiceTests {
 
         let event = try JSONDecoder().decode(ChatStreamService.StreamEvent.self, from: data)
 
-        if case .token(let content, let hasMemoryMoment, let hasPatternInsight) = event {
+        if case .token(let content, let hasMemoryMoment, let hasPatternInsight, let hasCrisisFlag) = event {
             #expect(content == "I noticed [PATTERN: stuck before transitions]")
             #expect(hasMemoryMoment == false)
             #expect(hasPatternInsight == true)
@@ -237,7 +238,7 @@ struct ChatStreamServiceTests {
 
         let event = try JSONDecoder().decode(ChatStreamService.StreamEvent.self, from: data)
 
-        if case .token(_, let hasMemoryMoment, let hasPatternInsight) = event {
+        if case .token(_, let hasMemoryMoment, let hasPatternInsight, _) = event {
             #expect(hasMemoryMoment == true)
             #expect(hasPatternInsight == false)  // Defaults to false
         } else {
@@ -254,9 +255,85 @@ struct ChatStreamServiceTests {
 
         let event = try JSONDecoder().decode(ChatStreamService.StreamEvent.self, from: data)
 
-        if case .token(_, let hasMemoryMoment, let hasPatternInsight) = event {
+        if case .token(_, let hasMemoryMoment, let hasPatternInsight, _) = event {
             #expect(hasMemoryMoment == true)
             #expect(hasPatternInsight == true)
+        } else {
+            Issue.record("Expected token event")
+        }
+    }
+
+    // MARK: - Story 4.1: Crisis Detection Flag Tests
+
+    @Test("StreamEvent decodes crisis_detected flag true")
+    func testDecodeCrisisDetectedTrue() throws {
+        let json = """
+        {"type":"token","content":"I hear you","memory_moment":false,"pattern_insight":false,"crisis_detected":true}
+        """
+        let data = json.data(using: .utf8)!
+
+        let event = try JSONDecoder().decode(ChatStreamService.StreamEvent.self, from: data)
+
+        if case .token(let content, let hasMemoryMoment, let hasPatternInsight, let hasCrisisFlag) = event {
+            #expect(content == "I hear you")
+            #expect(hasMemoryMoment == false)
+            #expect(hasPatternInsight == false)
+            #expect(hasCrisisFlag == true)
+        } else {
+            Issue.record("Expected token event")
+        }
+    }
+
+    @Test("StreamEvent backward compatibility - missing crisis_detected defaults to false")
+    func testDecodeCrisisDetectedBackwardCompat() throws {
+        // Pre-4.1 SSE events don't have crisis_detected field
+        let json = """
+        {"type":"token","content":"Normal response","memory_moment":false,"pattern_insight":false}
+        """
+        let data = json.data(using: .utf8)!
+
+        let event = try JSONDecoder().decode(ChatStreamService.StreamEvent.self, from: data)
+
+        if case .token(_, _, _, let hasCrisisFlag) = event {
+            #expect(hasCrisisFlag == false)  // Defaults to false
+        } else {
+            Issue.record("Expected token event")
+        }
+    }
+
+    @Test("StreamEvent decodes all three flags true simultaneously")
+    func testDecodeAllFlagsTrue() throws {
+        let json = """
+        {"type":"token","content":"All flags","memory_moment":true,"pattern_insight":true,"crisis_detected":true}
+        """
+        let data = json.data(using: .utf8)!
+
+        let event = try JSONDecoder().decode(ChatStreamService.StreamEvent.self, from: data)
+
+        if case .token(_, let hasMemoryMoment, let hasPatternInsight, let hasCrisisFlag) = event {
+            #expect(hasMemoryMoment == true)
+            #expect(hasPatternInsight == true)
+            #expect(hasCrisisFlag == true)
+        } else {
+            Issue.record("Expected token event")
+        }
+    }
+
+    @Test("StreamEvent decodes token with no optional flags at all")
+    func testDecodeTokenMinimalFields() throws {
+        // Absolute minimum: just type and content — all flags default to false
+        let json = """
+        {"type":"token","content":"Bare minimum"}
+        """
+        let data = json.data(using: .utf8)!
+
+        let event = try JSONDecoder().decode(ChatStreamService.StreamEvent.self, from: data)
+
+        if case .token(let content, let hasMemoryMoment, let hasPatternInsight, let hasCrisisFlag) = event {
+            #expect(content == "Bare minimum")
+            #expect(hasMemoryMoment == false)
+            #expect(hasPatternInsight == false)
+            #expect(hasCrisisFlag == false)
         } else {
             Issue.record("Expected token event")
         }

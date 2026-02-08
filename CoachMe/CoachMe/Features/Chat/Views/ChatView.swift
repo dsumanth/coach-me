@@ -215,6 +215,10 @@ struct ChatView: View {
                 SettingsView()
             }
         }
+        // Crisis resource sheet (Story 4.2)
+        .sheet(isPresented: $viewModel.showCrisisResources) {
+            CrisisResourceSheet()
+        }
         // Delete conversation confirmation alert (Story 2.6 - Task 4.2)
         .singleConversationDeleteAlert(isPresented: $viewModel.showDeleteConfirmation) {
             Task {
@@ -250,6 +254,11 @@ struct ChatView: View {
                         conversationId: conversationId,
                         messages: viewModel.messages
                     )
+                }
+
+                // Story 4.2: Show crisis resource sheet when crisis was detected
+                if viewModel.currentResponseHasCrisisFlag {
+                    viewModel.showCrisisResources = true
                 }
             }
         }
@@ -294,6 +303,8 @@ struct ChatView: View {
             isOpeningRoutedConversation = false
             hasResolvedInitialRoute = true
         }
+        .contentShape(Rectangle())
+        .simultaneousGesture(backToInboxSwipeGesture)
     }
 
     // MARK: - Auth Configuration
@@ -652,6 +663,24 @@ struct ChatView: View {
     /// Navigates back to inbox-style conversation list.
     private func navigateToInbox() {
         router.navigateToConversationList()
+    }
+
+    /// iMessage-style left-edge swipe back gesture.
+    /// Only triggers from the leading edge and when horizontal intent is clear.
+    private var backToInboxSwipeGesture: some Gesture {
+        DragGesture(minimumDistance: 18, coordinateSpace: .local)
+            .onEnded { value in
+                let startedFromLeftEdge = value.startLocation.x <= 28
+                let horizontalDistance = value.translation.width
+                let verticalDistance = abs(value.translation.height)
+                let predictedHorizontalDistance = value.predictedEndTranslation.width
+                let hasBackIntent = horizontalDistance > 72 || predictedHorizontalDistance > 120
+                let horizontalDominant = horizontalDistance > verticalDistance
+
+                guard startedFromLeftEdge, hasBackIntent, horizontalDominant else { return }
+
+                navigateToInbox()
+            }
     }
 
     /// Starts a new conversation

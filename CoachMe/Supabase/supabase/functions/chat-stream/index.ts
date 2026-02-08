@@ -8,6 +8,7 @@ import { loadUserContext, loadRelevantHistory } from '../_shared/context-loader.
 import { buildCoachingPrompt, hasMemoryMoments, hasPatternInsights } from '../_shared/prompt-builder.ts';
 import { determineDomain } from '../_shared/domain-router.ts';
 import { detectCrossDomainPatterns, filterByRateLimit } from '../_shared/pattern-synthesizer.ts';
+import { detectCrisis } from '../_shared/crisis-detector.ts';
 import type { CoachingDomain } from '../_shared/prompt-builder.ts';
 
 interface ChatRequest {
@@ -64,23 +65,32 @@ serve(async (req: Request) => {
       return errorResponse('Failed to save message', 500);
     }
 
-    // Story 2.4 + 3.3 + 3.5: Load user context, history, and cross-domain patterns in parallel
+    // Story 2.4 + 3.3 + 3.5: Load user context, history, patterns, and conversation messages in parallel
     // Target <200ms combined per architecture NFR
     // Story 3.5: Pattern detection runs in parallel (not on critical path)
-    const [userContext, conversationHistory, patternResult] = await Promise.all([
+    // Story 4.5: Crisis detection is per-message only. Subsequent messages and conversations
+    // follow the normal pipeline. No persistent "crisis mode" exists. This is by design.
+    const [userContext, conversationHistory, patternResult, rawHistory] = await Promise.all([
       loadUserContext(supabase, userId),
       loadRelevantHistory(supabase, userId, conversationId),
       detectCrossDomainPatterns(userId, supabase),
+      // Load conversation history for context (most recent 20 messages)
+      // Fetch newest first, then reverse to chronological order
+      supabase
+        .from('messages')
+        .select('role, content')
+        .eq('conversation_id', conversationId)
+        .order('created_at', { ascending: false })
+        .limit(20)
+        .then((res: { data: { role: string; content: string }[] | null }) => res.data),
     ]);
 
-    // Load conversation history for context (most recent 20 messages)
-    // Fetch newest first, then reverse to chronological order
-    const { data: rawHistory } = await supabase
-      .from('messages')
-      .select('role, content')
-      .eq('conversation_id', conversationId)
-      .order('created_at', { ascending: false })
-      .limit(20);
+    // Story 4.1: Crisis detection with recent message context for improved accuracy
+    // Runs after rawHistory is available so we can pass the last 3 messages
+    const recentForCrisis = (rawHistory ?? [])
+      .slice(0, 3)
+      .map((m: { role: string; content: string }) => ({ role: m.role, content: m.content }));
+    const crisisResult = await detectCrisis(message, recentForCrisis);
 
     // Filter empty messages, reverse to chronological, and ensure alternating roles
     // (Previous blank responses left orphaned user messages in DB)
@@ -135,13 +145,15 @@ serve(async (req: Request) => {
       supabase,
     );
 
-    // Story 3.1 + 3.3 + 3.5: Build context-aware, domain-specific system prompt
+    // Story 3.1 + 3.3 + 3.5 + 4.1: Build context-aware, domain-specific system prompt
+    // Story 4.1: Pass crisisDetected to prepend crisis-specific prompt section
     const systemPrompt = buildCoachingPrompt(
       userContext,
       domainResult.domain,
       domainResult.shouldClarify,
       conversationHistory.conversations,
       eligiblePatterns,
+      crisisResult.crisisDetected,
     );
     const messages: ChatMessage[] = [
       { role: 'system', content: systemPrompt },
@@ -177,12 +189,13 @@ serve(async (req: Request) => {
               if (!patternInsightFound) {
                 patternInsightFound = hasPatternInsights(fullContent);
               }
-              // Send SSE event with memory_moment and pattern_insight flags
+              // Send SSE event with memory_moment, pattern_insight, and crisis_detected flags
               const event = `data: ${JSON.stringify({
                 type: 'token',
                 content: chunk.content,
                 memory_moment: memoryMomentFound,
                 pattern_insight: patternInsightFound,
+                crisis_detected: crisisResult.crisisDetected,
               })}\n\n`;
               controller.enqueue(encoder.encode(event));
             }
@@ -226,6 +239,7 @@ serve(async (req: Request) => {
 
               // AC3: Log usage and cost
               const costUsd = calculateCost(tokenUsage, model);
+              // Story 4.1: Include crisis_detected in usage logging for monitoring
               await logUsage(supabase, {
                 userId,
                 conversationId,
@@ -234,15 +248,18 @@ serve(async (req: Request) => {
                 promptTokens: tokenUsage.prompt_tokens,
                 completionTokens: tokenUsage.completion_tokens,
                 costUsd,
+                crisisDetected: crisisResult.crisisDetected,
               });
 
               // Send done event (use snake_case to match iOS client decoder)
               // Story 3.1: Include domain in metadata for future history view badges
+              // Story 4.1: Include crisis_detected flag for iOS client
               const doneEvent = `data: ${JSON.stringify({
                 type: 'done',
                 message_id: assistantMessageId,
                 usage: tokenUsage,
                 domain: domainResult.domain,
+                crisis_detected: crisisResult.crisisDetected,
               })}\n\n`;
               controller.enqueue(encoder.encode(doneEvent));
             }
@@ -286,3 +303,4 @@ serve(async (req: Request) => {
 // Note: System prompt building moved to _shared/prompt-builder.ts (Story 2.4)
 // Domain routing added in Story 3.1 via _shared/domain-router.ts
 // Cross-domain pattern synthesis added in Story 3.5 via _shared/pattern-synthesizer.ts
+// Crisis detection pipeline added in Story 4.1 via _shared/crisis-detector.ts

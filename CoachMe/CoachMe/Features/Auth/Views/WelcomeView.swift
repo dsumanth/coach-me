@@ -17,8 +17,8 @@ struct WelcomeView: View {
     /// Callback when authentication succeeds
     var onAuthenticated: (() -> Void)?
 
-    /// Terms of Service URL - update with actual URL when available
-    private static let termsOfServiceURL = URL(string: "https://coachme.app/terms")!
+    /// Terms of Service URL — shared via AppURLs (Story 4.3)
+    private static let termsOfServiceURL = AppURLs.termsOfService
 
     var body: some View {
         ZStack {

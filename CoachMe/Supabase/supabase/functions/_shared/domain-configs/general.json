@@ -8,5 +8,6 @@
   "personality": "empathetic coach who adapts to whatever the user needs",
   "domainKeywords": [],
   "focusAreas": [],
-  "enabled": true
+  "enabled": true,
+  "guardrails": ""
 }
