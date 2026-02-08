@@ -339,6 +339,8 @@ final class AuthService {
     /// Clear all session data from Keychain
     private func clearSession() throws {
         try keychainManager.clearAllAuthData()
+        ConversationListCache.clear()
+        ChatMessageCache.clearAll()
     }
 
     /// Format PersonNameComponents into a display name

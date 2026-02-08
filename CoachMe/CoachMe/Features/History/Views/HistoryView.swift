@@ -93,7 +93,10 @@ struct HistoryView: View {
         List {
             ForEach(viewModel.conversations) { conversation in
                 NavigationLink(value: conversation) {
-                    ConversationRow(conversation: conversation)
+                    ConversationRow(
+                        conversation: conversation,
+                        preview: viewModel.previewText(for: conversation)
+                    )
                 }
                 .listRowBackground(Color.clear)
                 .listRowSeparatorTint(Color.adaptiveText(colorScheme, isPrimary: false).opacity(0.15))

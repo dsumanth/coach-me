@@ -23,22 +23,29 @@ struct MemoryMomentText: View {
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
-        HStack(spacing: 4) {
-            // Sparkle indicator - subtle "memory" cue
-            Image(systemName: "sparkle")
-                .font(.caption2)
-                .foregroundStyle(indicatorColor)
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 6) {
+                // Sparkle indicator - subtle "memory" cue
+                Image(systemName: "sparkle")
+                    .font(.caption2)
+                    .foregroundStyle(indicatorColor)
+
+                Text("From what you shared before")
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(labelColor)
+            }
 
             Text(content)
                 .font(.body)
                 .foregroundStyle(textColor)
+                .fixedSize(horizontal: false, vertical: true)
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 4)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
         .background(backgroundColor)
         .clipShape(RoundedRectangle(cornerRadius: 6))
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("I remembered: \(content)")
+        .accessibilityLabel("From what you shared before: \(content)")
     }
 
     // MARK: - Adaptive Colors
@@ -61,6 +68,11 @@ struct MemoryMomentText: View {
     /// Text: primary text color for each mode
     private var textColor: Color {
         Color.adaptiveText(colorScheme)
+    }
+
+    /// Label: secondary text color for each mode
+    private var labelColor: Color {
+        Color.adaptiveText(colorScheme, isPrimary: false)
     }
 }
 

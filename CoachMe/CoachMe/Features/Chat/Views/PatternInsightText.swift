@@ -32,47 +32,47 @@ struct PatternInsightText: View {
     private var isCrossDomain: Bool { domains.count >= 2 }
 
     var body: some View {
-        HStack(alignment: .top, spacing: 8) {
-            // Left border accent (2px, accent-primary per UX-5)
-            RoundedRectangle(cornerRadius: 1)
-                .fill(borderColor)
-                .frame(width: 2)
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .top, spacing: 6) {
+                // Story 3.5: Link icon for cross-domain, lightbulb for single-domain
+                Image(systemName: isCrossDomain ? "link" : "lightbulb.fill")
+                    .font(.callout)
+                    .foregroundStyle(indicatorColor)
+                    .padding(.top, 1)
 
-            VStack(alignment: .leading, spacing: 6) {
-                HStack(alignment: .top, spacing: 6) {
-                    // Story 3.5: Link icon for cross-domain, lightbulb for single-domain
-                    Image(systemName: isCrossDomain ? "link" : "lightbulb.fill")
-                        .font(.caption)
-                        .foregroundStyle(indicatorColor)
-                        .padding(.top, 2)
+                Text(content)
+                    .font(.body)
+                    .foregroundStyle(textColor)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
 
-                    Text(content)
-                        .font(.body)
-                        .foregroundStyle(textColor)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-
-                // Story 3.5 Task 5.5: Domain badges showing connected domains
-                if isCrossDomain {
-                    HStack(spacing: 4) {
-                        ForEach(domains, id: \.self) { domain in
-                            Text(domain.capitalized)
-                                .font(.caption2)
-                                .foregroundStyle(indicatorColor)
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 2)
-                                .background(
-                                    Capsule()
-                                        .fill(indicatorColor.opacity(0.12))
-                                )
-                        }
+            // Story 3.5 Task 5.5: Domain badges showing connected domains
+            if isCrossDomain {
+                HStack(spacing: 4) {
+                    ForEach(domains, id: \.self) { domain in
+                        Text(domain.capitalized)
+                            .font(.caption2)
+                            .foregroundStyle(indicatorColor)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(
+                                Capsule()
+                                    .fill(indicatorColor.opacity(0.12))
+                            )
                     }
                 }
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 8)
         }
+        .padding(.leading, 14)
+        .padding(.trailing, 10)
+        .padding(.vertical, 8)
         .background(backgroundColor)
+        .overlay(alignment: .leading) {
+            // Left border accent (2px, accent-primary per UX-5)
+            Rectangle()
+                .fill(borderColor)
+                .frame(width: 2)
+        }
         .clipShape(RoundedRectangle(cornerRadius: 8))
         .accessibilityElement(children: .combine)
         .accessibilityLabel(accessibilityText)

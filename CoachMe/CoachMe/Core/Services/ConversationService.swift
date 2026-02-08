@@ -162,7 +162,8 @@ final class ConversationService: ConversationServiceProtocol {
         }
 
         do {
-            let result: [Conversation] = try await supabase
+            struct IdOnly: Decodable { let id: UUID }
+            let result: [IdOnly] = try await supabase
                 .from("conversations")
                 .select("id")
                 .eq("id", value: id.uuidString)
@@ -220,7 +221,8 @@ final class ConversationService: ConversationServiceProtocol {
         do {
             // RLS policy "Users can delete own conversations" already enforces ownership
             // but we verify locally for better error messaging
-            let existing: [Conversation] = try await supabase
+            struct IdOnly: Decodable { let id: UUID }
+            let existing: [IdOnly] = try await supabase
                 .from("conversations")
                 .select("id")
                 .eq("id", value: id.uuidString)

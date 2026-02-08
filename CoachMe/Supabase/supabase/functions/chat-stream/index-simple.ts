@@ -107,7 +107,7 @@ serve(async (req: Request) => {
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
+        model: 'claude-haiku-4-5-20251001',
         max_tokens: 4096,
         temperature: 0.7,
         system: systemPrompt,
@@ -190,7 +190,7 @@ serve(async (req: Request) => {
             user_id: userId,
             conversation_id: conversationId,
             message_id: assistantMessageId,
-            model: 'claude-sonnet-4-20250514',
+            model: 'claude-haiku-4-5-20251001',
             tokens_in: promptTokens,
             tokens_out: completionTokens,
             cost_usd: costUsd,

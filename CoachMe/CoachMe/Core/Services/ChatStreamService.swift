@@ -101,8 +101,11 @@ final class ChatStreamService {
     private let session: URLSession
     private var authToken: String?
 
-    /// Request timeout in seconds (30s default for streaming)
-    private let requestTimeout: TimeInterval = 30
+    /// Request timeout in seconds (longer than default to tolerate server prep + cold starts)
+    private let requestTimeout: TimeInterval = 90
+
+    /// One automatic reconnect for transient network drops before any stream tokens arrive
+    private let maxConnectionAttempts = 2
 
     // MARK: - Initialization
 
@@ -115,7 +118,7 @@ final class ChatStreamService {
     init(
         supabaseURL: String = Configuration.supabaseURL,
         supabaseKey: String = Configuration.supabasePublishableKey,
-        session: URLSession = .shared
+        session: URLSession? = nil
     ) {
         // Gracefully handle invalid URL instead of crashing
         if let url = URL(string: "\(supabaseURL)/functions/v1/chat-stream") {
@@ -129,7 +132,7 @@ final class ChatStreamService {
             self.chatStreamURL = URL(string: "https://invalid.supabase.co/functions/v1/chat-stream")!
         }
         self.supabaseKey = supabaseKey
-        self.session = session
+        self.session = session ?? Self.makeDefaultSession()
     }
 
     // MARK: - Public Methods
@@ -151,87 +154,39 @@ final class ChatStreamService {
         AsyncThrowingStream { continuation in
             // Track the inner task for cancellation propagation
             let streamTask = Task {
-                do {
-                    // Check for cancellation before starting
-                    try Task.checkCancellation()
+                var attempt = 1
 
-                    var request = URLRequest(url: chatStreamURL)
-                    request.httpMethod = "POST"
-                    request.timeoutInterval = requestTimeout
-                    request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-                    request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
-                    request.setValue(supabaseKey, forHTTPHeaderField: "apikey")
+                while attempt <= maxConnectionAttempts {
+                    var didReceiveStreamData = false
+                    do {
+                        didReceiveStreamData = try await streamOnce(
+                            message: message,
+                            conversationId: conversationId,
+                            continuation: continuation
+                        )
+                        continuation.finish()
+                        return
+                    } catch is CancellationError {
+                        continuation.finish()
+                        return
+                    } catch {
+                        let shouldRetry = shouldRetryAfter(error: error)
 
-                    if let token = authToken {
-                        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
                         #if DEBUG
-                        print("ChatStreamService: Auth token set (length: \(token.count))")
+                        print("ChatStreamService: Stream attempt \(attempt) failed: \(error.localizedDescription)")
                         #endif
-                    } else {
-                        #if DEBUG
-                        print("ChatStreamService: WARNING - No auth token!")
-                        #endif
-                    }
 
-                    let body = ChatRequest(message: message, conversationId: conversationId)
-                    request.httpBody = try JSONEncoder().encode(body)
-
-                    #if DEBUG
-                    print("ChatStreamService: POST \(self.chatStreamURL)")
-                    #endif
-
-                    let (bytes, response) = try await session.bytes(for: request)
-
-                    guard let httpResponse = response as? HTTPURLResponse else {
-                        throw ChatStreamError.invalidResponse
-                    }
-
-                    #if DEBUG
-                    print("ChatStreamService: HTTP \(httpResponse.statusCode)")
-                    #endif
-
-                    guard httpResponse.statusCode == 200 else {
-                        #if DEBUG
-                        // Try to read error body for more details
-                        var errorBody = ""
-                        for try await line in bytes.lines {
-                            errorBody += line
-                            if errorBody.count > 500 { break }
+                        // Only retry if transient, no data was received yet, and we have attempts left.
+                        // Mid-stream disconnects are non-retriable to prevent duplicate tokens.
+                        if shouldRetry, !didReceiveStreamData, attempt < maxConnectionAttempts {
+                            attempt += 1
+                            try? await Task.sleep(nanoseconds: 400_000_000)
+                            continue
                         }
-                        print("ChatStreamService: Error response: \(errorBody)")
-                        #endif
-                        throw ChatStreamError.httpError(statusCode: httpResponse.statusCode)
+
+                        continuation.finish(throwing: error)
+                        return
                     }
-
-                    for try await line in bytes.lines {
-                        // Check for cancellation on each line
-                        try Task.checkCancellation()
-
-                        if line.hasPrefix("data: ") {
-                            let jsonString = String(line.dropFirst(6))
-                            if let data = jsonString.data(using: .utf8) {
-                                do {
-                                    let event = try JSONDecoder().decode(StreamEvent.self, from: data)
-                                    continuation.yield(event)
-
-                                    // Check if stream is done
-                                    if case .done = event {
-                                        break
-                                    }
-                                } catch {
-                                    // Skip malformed JSON, continue with stream
-                                    #if DEBUG
-                                    print("ChatStreamService: Failed to decode event: \(error)")
-                                    #endif
-                                }
-                            }
-                        }
-                    }
-                    continuation.finish()
-                } catch is CancellationError {
-                    continuation.finish()
-                } catch {
-                    continuation.finish(throwing: error)
                 }
             }
 
@@ -240,6 +195,126 @@ final class ChatStreamService {
                 streamTask.cancel()
             }
         }
+    }
+
+    // MARK: - Internal Streaming
+
+    private func streamOnce(
+        message: String,
+        conversationId: UUID,
+        continuation: AsyncThrowingStream<StreamEvent, Error>.Continuation
+    ) async throws -> Bool {
+        try Task.checkCancellation()
+
+        var request = URLRequest(url: chatStreamURL)
+        request.httpMethod = "POST"
+        request.timeoutInterval = requestTimeout
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
+        request.setValue(supabaseKey, forHTTPHeaderField: "apikey")
+
+        if let token = authToken {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            #if DEBUG
+            print("ChatStreamService: Auth token set (length: \(token.count))")
+            #endif
+        } else {
+            #if DEBUG
+            print("ChatStreamService: WARNING - No auth token!")
+            #endif
+        }
+
+        let body = ChatRequest(message: message, conversationId: conversationId)
+        request.httpBody = try JSONEncoder().encode(body)
+
+        #if DEBUG
+        print("ChatStreamService: POST \(self.chatStreamURL)")
+        #endif
+
+        let (bytes, response) = try await session.bytes(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw ChatStreamError.invalidResponse
+        }
+
+        #if DEBUG
+        print("ChatStreamService: HTTP \(httpResponse.statusCode)")
+        #endif
+
+        guard httpResponse.statusCode == 200 else {
+            #if DEBUG
+            // Try to read error body for more details
+            var errorBody = ""
+            for try await line in bytes.lines {
+                errorBody += line
+                if errorBody.count > 500 { break }
+            }
+            print("ChatStreamService: Error response: \(errorBody)")
+            #endif
+            throw ChatStreamError.httpError(statusCode: httpResponse.statusCode)
+        }
+
+        var didReceiveStreamData = false
+
+        for try await line in bytes.lines {
+            // Check for cancellation on each line
+            try Task.checkCancellation()
+
+            if line.hasPrefix("data: ") {
+                let jsonString = String(line.dropFirst(6))
+                if let data = jsonString.data(using: .utf8) {
+                    do {
+                        let event = try JSONDecoder().decode(StreamEvent.self, from: data)
+                        didReceiveStreamData = true
+                        continuation.yield(event)
+
+                        // Check if stream is done
+                        if case .done = event {
+                            break
+                        }
+                    } catch {
+                        // Skip malformed JSON, continue with stream
+                        #if DEBUG
+                        print("ChatStreamService: Failed to decode event: \(error)")
+                        #endif
+                    }
+                }
+            }
+        }
+
+        return didReceiveStreamData
+    }
+
+    // MARK: - Network Resilience
+
+    private func shouldRetryAfter(error: Error) -> Bool {
+        if let urlError = error as? URLError {
+            switch urlError.code {
+            case .networkConnectionLost, .timedOut, .cannotConnectToHost, .dnsLookupFailed:
+                return true
+            default:
+                return false
+            }
+        }
+
+        let nsError = error as NSError
+        if nsError.domain == NSURLErrorDomain {
+            return nsError.code == NSURLErrorNetworkConnectionLost ||
+                nsError.code == NSURLErrorTimedOut ||
+                nsError.code == NSURLErrorCannotConnectToHost ||
+                nsError.code == NSURLErrorDNSLookupFailed
+        }
+
+        return false
+    }
+
+    private static func makeDefaultSession() -> URLSession {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.waitsForConnectivity = true
+        configuration.timeoutIntervalForRequest = 90
+        configuration.timeoutIntervalForResource = 120
+        configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
+        return URLSession(configuration: configuration)
     }
 }
 

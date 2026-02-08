@@ -73,19 +73,43 @@ serve(async (req: Request) => {
       detectCrossDomainPatterns(userId, supabase),
     ]);
 
-    // Load conversation history for context
-    const { data: historyMessages } = await supabase
+    // Load conversation history for context (most recent 20 messages)
+    // Fetch newest first, then reverse to chronological order
+    const { data: rawHistory } = await supabase
       .from('messages')
       .select('role, content')
       .eq('conversation_id', conversationId)
-      .order('created_at', { ascending: true })
-      .limit(20); // Limit history to prevent token overflow
+      .order('created_at', { ascending: false })
+      .limit(20);
+
+    // Filter empty messages, reverse to chronological, and ensure alternating roles
+    // (Previous blank responses left orphaned user messages in DB)
+    const filtered = (rawHistory ?? [])
+      .reverse()
+      .filter((m: { role: string; content: string }) => m.content?.trim());
+
+    // Enforce alternating user/assistant roles for Anthropic API compliance
+    const historyMessages: { role: string; content: string }[] = [];
+    for (const m of filtered) {
+      const lastRole = historyMessages.length > 0
+        ? historyMessages[historyMessages.length - 1].role
+        : null;
+      if (m.role === lastRole) {
+        // Consecutive same role: merge content (keeps most recent context)
+        historyMessages[historyMessages.length - 1] = {
+          role: m.role,
+          content: historyMessages[historyMessages.length - 1].content + '\n\n' + m.content,
+        };
+      } else {
+        historyMessages.push({ role: m.role, content: m.content });
+      }
+    }
 
     // Story 3.1: Determine coaching domain (target <100ms)
     const currentDomain = (conversation as { id: string; domain: string | null }).domain as CoachingDomain | null;
-    const recentForRouting = (historyMessages ?? [])
+    const recentForRouting = historyMessages
       .slice(-3)
-      .map((m: { role: string; content: string }) => ({ role: m.role, content: m.content }));
+      .map((m) => ({ role: m.role, content: m.content }));
 
     const domainResult = await determineDomain(message, {
       currentDomain,
@@ -121,7 +145,7 @@ serve(async (req: Request) => {
     );
     const messages: ChatMessage[] = [
       { role: 'system', content: systemPrompt },
-      ...(historyMessages ?? []).map((m: { role: string; content: string }) => ({
+      ...historyMessages.map((m) => ({
         role: m.role as 'user' | 'assistant',
         content: m.content,
       })),
@@ -133,7 +157,7 @@ serve(async (req: Request) => {
     let memoryMomentFound = false;
     let patternInsightFound = false;  // Story 3.4: Track pattern insight detection
     let tokenUsage = { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 };
-    const model = 'claude-sonnet-4-20250514';
+    const model = 'claude-haiku-4-5-20251001';
 
     const stream = new ReadableStream({
       async start(controller) {
@@ -165,6 +189,18 @@ serve(async (req: Request) => {
 
             if (chunk.type === 'done' && chunk.usage) {
               tokenUsage = chunk.usage;
+
+              // Don't save empty responses to DB — prevents poisoning future history
+              if (!fullContent.trim()) {
+                console.warn('Empty LLM response, skipping DB save');
+                const errorEvent = `data: ${JSON.stringify({
+                  type: 'error',
+                  message: "Coach's response was empty. Let's try again."
+                })}\n\n`;
+                controller.enqueue(encoder.encode(errorEvent));
+                controller.close();
+                return;
+              }
 
               // AC3: Save assistant message to database
               // Issue #7 FIX: Handle save error and report to user

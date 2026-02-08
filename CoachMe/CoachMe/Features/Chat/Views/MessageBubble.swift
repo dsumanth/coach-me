@@ -74,11 +74,12 @@ struct MessageBubble: View {
                 .textSelection(.enabled)
         } else {
             // Assistant messages: render with coaching tags
-            let result = parsed ?? TagParseResult(cleanText: message.content, tags: [])
+            let result = parsed ?? TagParseResult(cleanText: message.content, displayText: message.content, tags: [])
             VStack(alignment: .leading, spacing: 8) {
-                Text(result.cleanText)
+                Text(result.displayText)
                     .font(.body)
                     .foregroundColor(textColor)
+                    .fixedSize(horizontal: false, vertical: true)
                     .textSelection(.enabled)
 
                 // Story 2.4 + 3.4: Show coaching tags with type-specific visual treatment
@@ -120,22 +121,33 @@ struct MessageBubble: View {
     @ViewBuilder
     private var statusRow: some View {
         if message.isFromUser && isFailedToSend {
-            HStack(spacing: 6) {
+            HStack(spacing: 8) {
+                Image(systemName: "exclamationmark.circle.fill")
+                    .font(.subheadline)
+                    .foregroundStyle(Color.red)
+
                 Text("Not Delivered")
-                    .font(.caption2)
-                    .foregroundStyle(Color.red.opacity(0.9))
+                    .font(.footnote)
+                    .fontWeight(.medium)
+                    .foregroundStyle(Color.red)
 
                 if let onRetry {
                     Button(action: onRetry) {
-                        Image(systemName: "exclamationmark.circle.fill")
-                            .font(.caption)
-                            .foregroundStyle(Color.red)
+                        Text("Resend")
+                            .font(.footnote)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 5)
+                            .background(Color.red.opacity(0.85))
+                            .clipShape(Capsule())
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel("Retry message")
+                    .accessibilityLabel("Resend message")
                     .accessibilityHint("Attempts to send this message again")
                 }
             }
+            .padding(.top, 2)
         } else {
             Text(message.formattedTime)
                 .font(.caption2)

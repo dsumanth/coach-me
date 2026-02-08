@@ -69,6 +69,8 @@ final class SettingsViewModel {
 
         do {
             try await conversationService.deleteAllConversations()
+            ConversationListCache.clear()
+            ChatMessageCache.clearAll()
 
             #if DEBUG
             print("SettingsViewModel: All conversations deleted")

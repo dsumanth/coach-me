@@ -194,9 +194,9 @@ function calculateCost(
   model: string
 ): number {
   const pricing: Record<string, { input: number; output: number }> = {
-    'claude-sonnet-4-20250514': { input: 3.0, output: 15.0 },
+    'claude-haiku-4-5-20251001': { input: 0.25, output: 1.25 },
   };
-  const price = pricing[model] ?? { input: 3.0, output: 15.0 };
+  const price = pricing[model] ?? { input: 0.25, output: 1.25 };
   return (usage.prompt_tokens / 1_000_000) * price.input +
          (usage.completion_tokens / 1_000_000) * price.output;
 }
@@ -298,7 +298,7 @@ serve(async (req: Request) => {
     const assistantMessageId = crypto.randomUUID();
     let fullContent = '';
     let tokenUsage = { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 };
-    const model = 'claude-sonnet-4-20250514';
+    const model = 'claude-haiku-4-5-20251001';
 
     const stream = new ReadableStream({
       async start(controller) {

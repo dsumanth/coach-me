@@ -40,8 +40,10 @@ struct CoachingTag: Identifiable, Sendable, Equatable {
 
 /// Result of parsing text for all coaching tags (memory + pattern)
 struct TagParseResult: Sendable, Equatable {
-    /// Text with all tags removed, content preserved
+    /// Text with all tags removed, content preserved (for copy & accessibility)
     let cleanText: String
+    /// Text with pattern tags fully stripped (for rendering — patterns shown in separate box)
+    let displayText: String
     /// All detected tags, ordered by position in original text
     let tags: [CoachingTag]
     /// Whether any memory moments were found
@@ -50,7 +52,7 @@ struct TagParseResult: Sendable, Equatable {
     var hasPatternInsights: Bool { tags.contains { $0.type == .pattern } }
 
     static func == (lhs: TagParseResult, rhs: TagParseResult) -> Bool {
-        lhs.cleanText == rhs.cleanText && lhs.tags == rhs.tags
+        lhs.cleanText == rhs.cleanText && lhs.displayText == rhs.displayText && lhs.tags == rhs.tags
     }
 }
 
@@ -218,7 +220,7 @@ enum MemoryMomentParser {
     /// ```
     static func parseAll(_ text: String) -> TagParseResult {
         guard !text.isEmpty else {
-            return TagParseResult(cleanText: "", tags: [])
+            return TagParseResult(cleanText: "", displayText: "", tags: [])
         }
 
         let key = text as NSString
@@ -247,12 +249,20 @@ enum MemoryMomentParser {
         // Build tags array
         let tags = tagEntries.map { CoachingTag(type: $0.type, content: $0.content) }
 
-        // Build clean text by stripping both tag types
+        // Build clean text by stripping both tag types (content preserved for copy/accessibility)
         let cleanText = text
             .replacing(memoryPattern) { String($0.output.1) }
             .replacing(patternPattern) { String($0.output.1) }
 
-        let result = TagParseResult(cleanText: cleanText, tags: tags)
+        // Build display text — pattern tags fully removed (shown in separate box)
+        let rawDisplay = text
+            .replacing(memoryPattern) { String($0.output.1) }
+            .replacing(patternPattern) { _ in "" }
+        let displayText = rawDisplay
+            .replacing(/[ \t]{2,}/) { _ in " " }
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        let result = TagParseResult(cleanText: cleanText, displayText: displayText, tags: tags)
         parseAllCache.setObject(TagParseResultBox(result), forKey: key)
         return result
     }

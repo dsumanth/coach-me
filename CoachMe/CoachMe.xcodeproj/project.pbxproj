@@ -260,9 +260,11 @@
 			files = (
 			);
 			inputPaths = (
+				"${PROJECT_DIR}/../CoachMe/Supabase/supabase/functions/_shared/domain-configs/",
 			);
 			name = "Sync Domain Configs";
 			outputPaths = (
+				"$(DERIVED_FILE_DIR)/sync-domain-configs.stamp",
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/bash;

@@ -129,6 +129,13 @@ export function buildCoachingPrompt(
 
   // Story 3.2: Add domain-specific coaching from config (replaces hardcoded DOMAIN_PROMPTS)
   const domainConfig = getDomainConfig(domain);
+  if (Deno.env.get('DEBUG_DOMAIN') === 'true') {
+    console.log(`[DOMAIN DEBUG] domain: ${domain}`);
+    console.log(`[DOMAIN DEBUG] systemPromptAddition: ${domainConfig.systemPromptAddition?.substring(0, 80)}...`);
+    console.log(`[DOMAIN DEBUG] tone: ${domainConfig.tone}`);
+    console.log(`[DOMAIN DEBUG] methodology: ${domainConfig.methodology}`);
+    console.log(`[DOMAIN DEBUG] personality: ${domainConfig.personality?.substring(0, 80)}...`);
+  }
   if (domainConfig.systemPromptAddition) {
     prompt += `\n\n${domainConfig.systemPromptAddition}`;
   }

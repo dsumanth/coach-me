@@ -71,3 +71,8 @@ if [ "$CHANGED" -eq 0 ]; then
 else
   echo "Synced $CHANGED domain config file(s)."
 fi
+
+# Touch stamp file for Xcode dependency tracking
+if [ -n "${DERIVED_FILE_DIR:-}" ]; then
+  touch "${DERIVED_FILE_DIR}/sync-domain-configs.stamp"
+fi

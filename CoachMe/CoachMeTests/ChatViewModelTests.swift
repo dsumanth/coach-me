@@ -5,6 +5,7 @@
 //  Created by Code Review on 2/6/26.
 //
 
+import Foundation
 import Testing
 @testable import CoachMe
 

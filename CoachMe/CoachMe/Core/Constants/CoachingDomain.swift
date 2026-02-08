@@ -60,4 +60,32 @@ enum CoachingDomain: String, CaseIterable, Codable, Sendable {
         }
         return color
     }
+
+    /// Friendly coach persona name shown in inbox/thread previews.
+    var coachName: String {
+        switch self {
+        case .life: "Coach Sage"
+        case .career: "Coach Avery"
+        case .relationships: "Coach Maya"
+        case .mindset: "Coach Nova"
+        case .creativity: "Coach Luna"
+        case .fitness: "Coach Atlas"
+        case .leadership: "Coach Rowan"
+        case .general: "Coach Echo"
+        }
+    }
+
+    /// SF Symbol used for domain avatar in conversation previews.
+    var avatarSymbol: String {
+        switch self {
+        case .life: "leaf.fill"
+        case .career: "briefcase.fill"
+        case .relationships: "heart.fill"
+        case .mindset: "brain.head.profile"
+        case .creativity: "paintbrush.fill"
+        case .fitness: "figure.run"
+        case .leadership: "person.3.fill"
+        case .general: "bubble.left.and.text.bubble.right.fill"
+        }
+    }
 }

@@ -2,20 +2,29 @@
 //  ConversationListView.swift
 //  CoachMe
 //
-//  Story 3.6: Conversation list view showing all conversations
-//  organized by recency with domain badges and message previews
+//  Inbox-style home view for conversation threads.
 //
 
 import SwiftUI
 
-/// Conversation history list with swipe-to-delete and conversation selection
+/// Inbox-style home screen showing conversation threads
 struct ConversationListView: View {
     @State private var viewModel = ConversationListViewModel()
+    @State private var showSettings = false
+    @State private var showContextProfile = false
+    @State private var currentUserId: UUID?
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.router) private var router
 
     /// Callback when a conversation is selected for loading
     var onSelectConversation: ((UUID) -> Void)?
+
+    private let starters = [
+        "I've been feeling stuck lately...",
+        "I want to make a change but don't know where to start",
+        "Help me think through a decision",
+        "I need to process something that happened"
+    ]
 
     var body: some View {
         ZStack {
@@ -23,8 +32,7 @@ struct ConversationListView: View {
                 .ignoresSafeArea()
 
             VStack(spacing: 0) {
-                // Navigation bar
-                navigationBar
+                topBar
 
                 if viewModel.isLoading && viewModel.conversations.isEmpty {
                     loadingState
@@ -34,6 +42,9 @@ struct ConversationListView: View {
                     conversationList
                 }
             }
+        }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            bottomActionBar
         }
         .alert("Oops", isPresented: $viewModel.showError) {
             Button("OK", role: .cancel) {
@@ -66,70 +77,101 @@ struct ConversationListView: View {
                     .accessibilityLabel("Removing conversation")
             }
         }
+        .sheet(isPresented: $showSettings) {
+            NavigationStack {
+                SettingsView()
+            }
+        }
+        .sheet(isPresented: Binding(
+            get: { showContextProfile && currentUserId != nil },
+            set: { showContextProfile = $0 }
+        )) {
+            if let userId = currentUserId {
+                ContextProfileView(userId: userId)
+            }
+        }
         .task {
             await viewModel.loadConversations()
         }
     }
 
-    // MARK: - Navigation Bar
+    // MARK: - Top Bar
 
-    private var navigationBar: some View {
+    private var topBar: some View {
         ZStack {
-            Text("Conversations")
+            Text("Coach")
                 .font(.system(size: 20, weight: .semibold, design: .rounded))
-                .foregroundColor(Color.adaptiveText(colorScheme))
+                .foregroundStyle(Color.adaptiveText(colorScheme))
 
             HStack {
-                Button {
-                    router.navigateToChat()
-                } label: {
-                    ZStack {
-                        Circle()
-                            .fill(
-                                colorScheme == .dark
-                                    ? Color.warmGray700.opacity(0.42)
-                                    : Color.white.opacity(0.78)
-                            )
-                        Circle()
-                            .stroke(
-                                colorScheme == .dark
-                                    ? Color.white.opacity(0.2)
-                                    : Color.black.opacity(0.08),
-                                lineWidth: 1
-                            )
-                        Image(systemName: "chevron.left")
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(Color.adaptiveText(colorScheme, isPrimary: false))
-                    }
-                    .frame(width: 36, height: 36)
-                }
-                .accessibilityLabel("Back to chat")
-
                 Spacer()
+
+                Menu {
+                    Button {
+                        Task { @MainActor in
+                            currentUserId = await AuthService.shared.currentUserId
+                            showContextProfile = currentUserId != nil
+                        }
+                    } label: {
+                        Label("Your profile", systemImage: "person.crop.circle")
+                    }
+
+                    Button {
+                        showSettings = true
+                    } label: {
+                        Label("Settings", systemImage: "gearshape")
+                    }
+                } label: {
+                    Circle()
+                        .fill(colorScheme == .dark ? Color.warmGray700.opacity(0.62) : Color.white.opacity(0.86))
+                        .overlay(
+                            Circle()
+                                .stroke(
+                                    colorScheme == .dark
+                                        ? Color.white.opacity(0.16)
+                                        : Color.black.opacity(0.07),
+                                    lineWidth: 1
+                                )
+                        )
+                        .overlay(
+                            Image(systemName: "ellipsis")
+                                .font(.system(size: 15, weight: .semibold))
+                                .foregroundStyle(Color.adaptiveText(colorScheme, isPrimary: false))
+                        )
+                        .frame(width: 44, height: 44)
+                }
+                .accessibilityLabel("More options")
             }
         }
         .padding(.horizontal, 16)
-        .padding(.vertical, 8)
+        .padding(.top, 8)
+        .padding(.bottom, 10)
     }
 
-    // MARK: - Conversation List
+    // MARK: - Content
 
     private var conversationList: some View {
         List {
             ForEach(viewModel.conversations) { conversation in
-                ConversationRow(conversation: conversation)
-                    .listRowBackground(Color.clear)
-                    .listRowSeparatorTint(Color.adaptiveText(colorScheme, isPrimary: false).opacity(0.15))
-                    .onTapGesture {
-                        selectConversation(conversation)
+                Button {
+                    selectConversation(conversation)
+                } label: {
+                    ConversationRow(
+                        conversation: conversation,
+                        preview: viewModel.previewText(for: conversation)
+                    )
+                }
+                .buttonStyle(.plain)
+                .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
+                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                    Button(role: .destructive) {
+                        viewModel.requestDelete(conversation)
+                    } label: {
+                        Label("Delete", systemImage: "trash")
                     }
-                    .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                        Button(role: .destructive) {
-                            viewModel.requestDelete(conversation)
-                        } label: {
-                            Label("Delete", systemImage: "trash")
-                        }
-                    }
+                }
             }
         }
         .listStyle(.plain)
@@ -139,7 +181,60 @@ struct ConversationListView: View {
         }
     }
 
-    // MARK: - States
+    private var emptyState: some View {
+        ScrollView {
+            VStack(spacing: 28) {
+                VStack(spacing: 12) {
+                    Image(systemName: "bubble.left.and.text.bubble.right.fill")
+                        .font(.system(size: 50))
+                        .foregroundStyle(Color.adaptiveTerracotta(colorScheme).opacity(0.88))
+                        .accessibilityHidden(true)
+
+                    Text("What's on your mind?")
+                        .font(.system(size: 48, weight: .bold))
+                        .foregroundStyle(Color.adaptiveText(colorScheme))
+
+                    Text("I'm here to help you reflect, plan, and grow.")
+                        .font(.title3)
+                        .foregroundStyle(Color.adaptiveText(colorScheme, isPrimary: false))
+                        .multilineTextAlignment(.center)
+                }
+                .padding(.top, 52)
+
+                VStack(spacing: 12) {
+                    ForEach(starters, id: \.self) { starter in
+                        Button {
+                            router.navigateToChat(starter: starter)
+                        } label: {
+                            Text(starter)
+                                .font(.system(size: 17))
+                                .foregroundStyle(Color.adaptiveText(colorScheme))
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.horizontal, 18)
+                                .padding(.vertical, 18)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                                        .fill(colorScheme == .dark ? Color.warmGray700.opacity(0.56) : Color.white.opacity(0.84))
+                                )
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                                        .stroke(
+                                            colorScheme == .dark
+                                                ? Color.white.opacity(0.08)
+                                                : Color.black.opacity(0.05),
+                                            lineWidth: 1
+                                        )
+                                )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.top, 6)
+            }
+            .padding(.horizontal, 16)
+            .padding(.bottom, 20)
+        }
+    }
 
     private var loadingState: some View {
         VStack {
@@ -152,29 +247,43 @@ struct ConversationListView: View {
         .accessibilityLabel("Loading conversations")
     }
 
-    private var emptyState: some View {
-        VStack(spacing: 16) {
-            Spacer()
+    // MARK: - Bottom CTA
 
-            Image(systemName: "bubble.left.and.text.bubble.right")
-                .font(.system(size: 48))
-                .foregroundStyle(Color.adaptiveText(colorScheme, isPrimary: false).opacity(0.4))
+    private var bottomActionBar: some View {
+        VStack(spacing: 0) {
+            Divider()
+                .opacity(0.08)
 
-            Text("No conversations yet")
-                .font(.headline)
-                .foregroundStyle(Color.adaptiveText(colorScheme))
-
-            Text("Start one!")
-                .font(.subheadline)
-                .foregroundStyle(Color.adaptiveText(colorScheme, isPrimary: false))
-
-            Spacer()
+            Button {
+                startNewConversation()
+            } label: {
+                HStack(spacing: 10) {
+                    Image(systemName: "square.and.pencil")
+                        .font(.system(size: 16, weight: .semibold))
+                    Text("New chat")
+                        .font(.system(size: 17, weight: .semibold))
+                }
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity)
+                .frame(height: 50)
+                .background(
+                    Capsule()
+                        .fill(Color.adaptiveTerracotta(colorScheme))
+                )
+                .padding(.horizontal, 16)
+                .padding(.top, 10)
+                .padding(.bottom, 10)
+            }
+            .buttonStyle(.plain)
+            .background(Color.adaptiveCream(colorScheme))
         }
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("No conversations yet. Start one!")
     }
 
     // MARK: - Actions
+
+    private func startNewConversation() {
+        router.navigateToChat()
+    }
 
     private func selectConversation(_ conversation: ConversationService.Conversation) {
         onSelectConversation?(conversation.id)

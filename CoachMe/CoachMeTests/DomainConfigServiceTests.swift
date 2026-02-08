@@ -12,6 +12,7 @@ import Foundation
 
 // MARK: - DomainConfig Model Decoding Tests
 
+@MainActor
 struct DomainConfigDecodingTests {
 
     @Test("Decode career config from JSON with all fields")
@@ -79,6 +80,7 @@ struct DomainConfigDecodingTests {
 
 // MARK: - DomainConfig Factory Tests
 
+@MainActor
 struct DomainConfigFactoryTests {
 
     @Test("general() returns correct fallback config")

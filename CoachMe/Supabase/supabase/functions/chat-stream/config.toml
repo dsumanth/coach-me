@@ -1,2 +1,4 @@
 [functions.chat-stream]
-verify_jwt = true
+# Gateway verify_jwt disabled: incompatible with new sb_publishable_ API key format.
+# JWT verification is handled in _shared/auth.ts via supabase.auth.getUser(jwt).
+verify_jwt = false

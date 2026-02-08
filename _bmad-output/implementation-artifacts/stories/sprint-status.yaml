@@ -75,12 +75,12 @@ development_status:
   epic-3-retrospective: optional
 
   # ── Epic 4: Coaching Safety & Crisis Handling (5 stories) ──
-  epic-4: backlog
-  4-1-crisis-detection-pipeline: backlog
-  4-2-crisis-resource-display: backlog
-  4-3-coaching-disclaimers: backlog
-  4-4-tone-guardrails-and-clinical-boundaries: backlog
-  4-5-context-continuity-after-crisis: backlog
+  epic-4: in-progress
+  4-1-crisis-detection-pipeline: ready-for-dev
+  4-2-crisis-resource-display: ready-for-dev
+  4-3-coaching-disclaimers: ready-for-dev
+  4-4-tone-guardrails-and-clinical-boundaries: ready-for-dev
+  4-5-context-continuity-after-crisis: ready-for-dev
   epic-4-retrospective: optional
 
   # ── Epic 5: Creator Tools & Sharing (4 stories) ──

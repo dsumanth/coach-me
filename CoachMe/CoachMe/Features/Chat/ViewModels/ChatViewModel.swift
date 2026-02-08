@@ -132,6 +132,7 @@ final class ChatViewModel {
         // Add user message immediately
         let userMessage = ChatMessage.userMessage(content: trimmedInput, conversationId: conversationId)
         messages.append(userMessage)
+        persistCurrentConversationCache()
         failedUserMessageIDs.remove(userMessage.id)
         inputText = ""
 
@@ -158,6 +159,10 @@ final class ChatViewModel {
                 if !isConversationPersisted {
                     _ = try await conversationService.ensureConversationExists(id: conversationId)
                     isConversationPersisted = true
+
+                    // Set conversation title from first user message
+                    let title = String(trimmedInput.prefix(50))
+                    await conversationService.updateConversation(id: conversationId, title: title)
                 }
 
                 // Start streaming after brief delay for typing indicator UX
@@ -185,19 +190,30 @@ final class ChatViewModel {
                         tokenBuffer?.flush()
                         currentStreamMessageId = messageId
 
-                        // Finalize message
-                        let assistantMessage = ChatMessage(
-                            id: messageId,
-                            conversationId: conversationId,
-                            role: .assistant,
-                            content: streamingContent,
-                            createdAt: Date()
-                        )
-                        messages.append(assistantMessage)
+                        // Only create assistant message if we received actual content
+                        // Prevents blank bubbles from empty LLM responses
+                        if !streamingContent.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                            let assistantMessage = ChatMessage(
+                                id: messageId,
+                                conversationId: conversationId,
+                                role: .assistant,
+                                content: streamingContent,
+                                createdAt: Date()
+                            )
+                            messages.append(assistantMessage)
+                            persistCurrentConversationCache()
+                            lastUserMessageContent = nil  // Clear retry state on success
+                            error = nil
+                        } else {
+                            // Empty response — treat as a retryable failure
+                            #if DEBUG
+                            print("ChatViewModel: Empty assistant response, treating as failure")
+                            #endif
+                            self.error = .streamError("Coach's response was empty. Let's try again.")
+                            markUserMessageFailed(userMessage.id)
+                        }
                         streamingContent = ""
                         isStreaming = false
-                        error = nil
-                        lastUserMessageContent = nil  // Clear retry state on success
 
                     case .error(let message):
                         tokenBuffer?.flush()
@@ -225,6 +241,7 @@ final class ChatViewModel {
                             createdAt: Date()
                         )
                         messages.append(assistantMessage)
+                        persistCurrentConversationCache()
                         streamingContent = ""
                         lastUserMessageContent = nil
                     } else {
@@ -291,6 +308,7 @@ final class ChatViewModel {
         // Remove the last user message and re-send
         if let lastUserMessage = messages.last(where: { $0.role == .user }) {
             messages.removeAll { $0.id == lastUserMessage.id }
+            persistCurrentConversationCache()
         }
 
         // Re-send
@@ -313,6 +331,7 @@ final class ChatViewModel {
 
         failedUserMessageIDs.remove(messageID)
         messages.removeAll { $0.id == messageID }
+        persistCurrentConversationCache()
         inputText = failedMessage.content
         await sendMessage()
     }
@@ -349,7 +368,6 @@ final class ChatViewModel {
 
         // Reset state for the new conversation
         isLoading = true
-        messages = []
         currentConversationId = id
         isConversationPersisted = true  // Conversation already exists in DB
         inputText = ""
@@ -363,16 +381,31 @@ final class ChatViewModel {
         error = nil
         showError = false
 
+        // Instant render path: load local cache first.
+        let cachedMessages = ChatMessageCache.load(conversationId: id) ?? []
+        let hasCachedMessages = !cachedMessages.isEmpty
+        messages = cachedMessages
+        if hasCachedMessages {
+            // Keep thread interactive while cloud sync runs in background.
+            isLoading = false
+        }
+
         defer { isLoading = false }
 
         do {
             messages = try await conversationService.fetchMessages(conversationId: id)
+            persistCurrentConversationCache()
         } catch let convError as ConversationService.ConversationError {
-            self.error = .messageFailed(convError)
-            showError = true
+            // If cache is already shown, avoid interrupting with an alert.
+            if !hasCachedMessages {
+                self.error = .messageFailed(convError)
+                showError = true
+            }
         } catch {
-            self.error = .messageFailed(error)
-            showError = true
+            if !hasCachedMessages {
+                self.error = .messageFailed(error)
+                showError = true
+            }
         }
     }
 
@@ -397,6 +430,9 @@ final class ChatViewModel {
     func deleteConversation() async -> Bool {
         guard let conversationId = currentConversationId, isConversationPersisted else {
             // Conversation was never saved to DB, just start fresh
+            if let conversationId = currentConversationId {
+                ChatMessageCache.remove(conversationId: conversationId)
+            }
             startNewConversation()
             // Announce for VoiceOver users
             UIAccessibility.post(notification: .announcement, argument: "Conversation removed")
@@ -408,6 +444,7 @@ final class ChatViewModel {
 
         do {
             try await conversationService.deleteConversation(id: conversationId)
+            ChatMessageCache.remove(conversationId: conversationId)
 
             #if DEBUG
             print("ChatViewModel: Conversation deleted, starting fresh")
@@ -462,5 +499,11 @@ final class ChatViewModel {
         showError = false
         isLoading = false
         isStreaming = false
+    }
+
+    /// Persists in-memory messages for the current conversation so thread opens instantly next time.
+    private func persistCurrentConversationCache() {
+        guard let conversationId = currentConversationId else { return }
+        ChatMessageCache.save(messages: messages, conversationId: conversationId)
     }
 }

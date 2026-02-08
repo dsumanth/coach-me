@@ -29,7 +29,7 @@ export interface LLMConfig {
 
 const DEFAULT_CONFIG: LLMConfig = {
   provider: 'anthropic',
-  model: 'claude-sonnet-4-20250514',
+  model: 'claude-haiku-4-5-20251001',
   maxTokens: 4096,
   temperature: 0.7,
 };
@@ -240,7 +240,6 @@ export function calculateCost(
 ): number {
   const pricing: Record<string, { input: number; output: number }> = {
     // Anthropic pricing per 1M tokens
-    'claude-sonnet-4-20250514': { input: 3.0, output: 15.0 },
     'claude-opus-4-5-20251101': { input: 15.0, output: 75.0 },
     'claude-haiku-4-5-20251001': { input: 0.25, output: 1.25 },
     // OpenAI pricing per 1M tokens

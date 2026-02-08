@@ -103,6 +103,7 @@ struct MessageInput: View {
             }
         }
         .padding(.horizontal, 12)
+        .padding(.top, 8)
         .padding(.bottom, 8)
         .animation(.easeInOut(duration: 0.2), value: voiceViewModel.isRecording)
         .animation(.easeInOut(duration: 0.15), value: hasText)

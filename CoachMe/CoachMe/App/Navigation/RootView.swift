@@ -31,7 +31,7 @@ struct RootView: View {
                 switch router.currentScreen {
                 case .welcome:
                     WelcomeView(onAuthenticated: {
-                        router.navigateToChat()
+                        router.navigateToConversationList()
                     })
                     .transition(.opacity)
 
@@ -68,7 +68,7 @@ struct RootView: View {
         await authViewModel.checkExistingSession()
 
         if authViewModel.isAuthenticated {
-            router.navigateToChat()
+            router.navigateToConversationList()
         }
 
         // Hide the session check overlay

@@ -28,11 +28,15 @@ final class Router {
     /// Conversation ID to load when navigating back to chat from conversation list
     var selectedConversationId: UUID?
 
+    /// Starter prompt to send when opening chat from inbox suggestions
+    var pendingStarterText: String?
+
     // MARK: - Navigation Methods
 
     /// Navigate to the chat screen (after successful authentication)
     func navigateToChat() {
         selectedConversationId = nil
+        pendingStarterText = nil
         currentScreen = .chat
     }
 
@@ -40,6 +44,14 @@ final class Router {
     /// - Parameter conversationId: The conversation to load in ChatView
     func navigateToChat(conversationId: UUID) {
         selectedConversationId = conversationId
+        pendingStarterText = nil
+        currentScreen = .chat
+    }
+
+    /// Navigate to chat and prefill/send a starter prompt from inbox
+    func navigateToChat(starter: String) {
+        selectedConversationId = nil
+        pendingStarterText = starter
         currentScreen = .chat
     }
 

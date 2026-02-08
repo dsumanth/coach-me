@@ -34,8 +34,17 @@ struct ChatView: View {
     /// Whether to show the settings view (Story 2.6)
     @State private var showSettings = false
 
-    /// Whether to show the conversation history sheet (Story 3.7)
-    @State private var showHistory = false
+    /// True while opening a routed conversation so we avoid flashing the empty-state.
+    @State private var isOpeningRoutedConversation = false
+
+    /// True once initial route intent has been resolved for this ChatView lifetime.
+    @State private var hasResolvedInitialRoute = false
+
+    /// Combined routing intent ID — changes trigger the .task to re-run
+    private var routeTaskId: String {
+        "\(router.selectedConversationId?.uuidString ?? "")-\(router.pendingStarterText ?? "")"
+    }
+
     @Environment(\.colorScheme) private var colorScheme
 
     // MARK: - Initialization
@@ -64,7 +73,11 @@ struct ChatView: View {
 
                 // Message list or empty state
                 if viewModel.messages.isEmpty {
-                    emptyState
+                    if shouldShowConversationLoadingState {
+                        loadingConversationState
+                    } else {
+                        emptyState
+                    }
                 } else {
                     messageList
                 }
@@ -86,6 +99,7 @@ struct ChatView: View {
 
                     MessageInput(viewModel: viewModel, voiceViewModel: voiceViewModel)
                 }
+                .background(composerDockBackground)
                 .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
@@ -201,15 +215,6 @@ struct ChatView: View {
                 SettingsView()
             }
         }
-        // Conversation history sheet (Story 3.7)
-        .sheet(isPresented: $showHistory) {
-            HistoryView(onContinueConversation: { conversationId in
-                Task {
-                    await viewModel.loadConversation(id: conversationId)
-                }
-            })
-            .presentationDragIndicator(.visible)
-        }
         // Delete conversation confirmation alert (Story 2.6 - Task 4.2)
         .singleConversationDeleteAlert(isPresented: $viewModel.showDeleteConfirmation) {
             Task {
@@ -258,15 +263,36 @@ struct ChatView: View {
                 dismissKeyboard()
             }
         }
-        .task {
-            // Set auth token for streaming API calls
-            await configureAuthToken()
+        .task(id: routeTaskId) {
+            let routedConversationId = router.selectedConversationId
+            let routedStarter = router.pendingStarterText
+            let hasRouteIntent = routedConversationId != nil || routedStarter != nil
 
-            // Load selected conversation from router (Story 3.6)
-            if let conversationId = router.selectedConversationId {
-                router.selectedConversationId = nil
-                await viewModel.loadConversation(id: conversationId)
+            if hasRouteIntent {
+                isOpeningRoutedConversation = true
+                hasResolvedInitialRoute = false
+            } else {
+                hasResolvedInitialRoute = true
             }
+
+            if let conversationId = routedConversationId {
+                // For conversation opens, load cache/messages first so UI appears instantly.
+                router.selectedConversationId = nil
+                async let authConfiguration: Void = configureAuthToken()
+                await viewModel.loadConversation(id: conversationId)
+                _ = await authConfiguration
+            } else if let starter = routedStarter {
+                // Starter prompts need auth configured before send/stream.
+                router.pendingStarterText = nil
+                await configureAuthToken()
+                await viewModel.sendMessage(starter)
+            } else {
+                // No route intent, just bootstrap auth/context services.
+                await configureAuthToken()
+            }
+
+            isOpeningRoutedConversation = false
+            hasResolvedInitialRoute = true
         }
     }
 
@@ -339,9 +365,9 @@ struct ChatView: View {
                 .foregroundColor(Color.adaptiveText(colorScheme))
 
             HStack {
-                // New conversation button
+                // Back to inbox button
                 Button {
-                    startNewConversation()
+                    navigateToInbox()
                 } label: {
                     ZStack {
                         Circle()
@@ -349,7 +375,7 @@ struct ChatView: View {
                                 colorScheme == .dark
                                     ? Color.warmGray700.opacity(0.42)
                                     : Color.white.opacity(0.78)
-                            )
+                                )
                         Circle()
                             .stroke(
                                 colorScheme == .dark
@@ -357,14 +383,14 @@ struct ChatView: View {
                                     : Color.black.opacity(0.08),
                                 lineWidth: 1
                             )
-                        Image(systemName: "plus.bubble")
+                        Image(systemName: "chevron.left")
                             .font(.system(size: 15, weight: .semibold))
                             .foregroundStyle(Color.adaptiveText(colorScheme, isPrimary: false))
                     }
                     .frame(width: 36, height: 36)
                 }
-                .accessibilityLabel("New conversation")
-                .accessibilityHint("Starts a new coaching conversation")
+                .accessibilityLabel("Back to inbox")
+                .accessibilityHint("Returns to your conversation list")
 
                 Spacer()
 
@@ -388,23 +414,19 @@ struct ChatView: View {
                     }
 
                     Button {
-                        navigateToHistory()
-                    } label: {
-                        Label("Conversation history", systemImage: "clock.arrow.circlepath")
-                    }
-
-                    Button {
                         showSettings = true
                     } label: {
                         Label("Settings", systemImage: "gearshape")
                     }
 
-                    Button(role: .destructive) {
-                        viewModel.showDeleteConfirmation = true
-                    } label: {
-                        Label("Delete conversation", systemImage: "trash")
+                    if canDeleteCurrentConversation {
+                        Button(role: .destructive) {
+                            viewModel.showDeleteConfirmation = true
+                        } label: {
+                            Label("Delete conversation", systemImage: "trash")
+                        }
+                        .accessibilityHint("Shows confirmation to delete this conversation")
                     }
-                    .accessibilityHint("Shows confirmation to delete this conversation")
                 } label: {
                     ZStack(alignment: .topTrailing) {
                         ZStack {
@@ -486,28 +508,39 @@ struct ChatView: View {
                 // Will integrate with sync service in Story 7.3
                 await viewModel.refresh()
             }
+            .onAppear {
+                scrollToBottomDeferred(proxy: proxy, animated: false)
+            }
+            .onChange(of: viewModel.currentConversationId) { _, _ in
+                // When opening a different thread, always jump to latest first.
+                scrollToBottomDeferred(proxy: proxy, animated: false)
+            }
+            .onChange(of: viewModel.messages.last?.id) { _, _ in
+                // Handles cache->server replacement where count may not change.
+                scrollToBottomDeferred(proxy: proxy, animated: false)
+            }
             .onChange(of: viewModel.messages.count) { _, _ in
-                scrollToBottom(proxy: proxy)
+                scrollToBottomDeferred(proxy: proxy)
             }
             .onChange(of: viewModel.isLoading) { _, isLoading in
                 if isLoading {
-                    scrollToBottom(proxy: proxy)
+                    scrollToBottomDeferred(proxy: proxy)
                 }
             }
             .onChange(of: viewModel.isStreaming) { _, isStreaming in
                 if isStreaming {
-                    scrollToBottom(proxy: proxy)
+                    scrollToBottomDeferred(proxy: proxy)
                 }
             }
             .onChange(of: viewModel.streamingContent) { _, _ in
                 // Auto-scroll as content streams in
-                scrollToBottom(proxy: proxy)
+                scrollToBottomDeferred(proxy: proxy)
             }
             .onReceive(NotificationCenter.default.publisher(
                 for: UIResponder.keyboardWillChangeFrameNotification
             )) { _ in
                 DispatchQueue.main.async {
-                    scrollToBottom(proxy: proxy)
+                    scrollToBottomDeferred(proxy: proxy)
                 }
             }
         }
@@ -523,6 +556,17 @@ struct ChatView: View {
             }
             .padding(.top, 40)
         }
+    }
+
+    private var loadingConversationState: some View {
+        VStack {
+            Spacer()
+            ProgressView()
+                .scaleEffect(1.1)
+                .tint(Color.adaptiveText(colorScheme, isPrimary: false))
+            Spacer()
+        }
+        .accessibilityLabel("Loading conversation")
     }
 
     /// Inline suggestion chip for context setup.
@@ -605,9 +649,9 @@ struct ChatView: View {
 
     // MARK: - Actions
 
-    /// Shows conversation history sheet (Story 3.7 — sheet-based, not router-based)
-    private func navigateToHistory() {
-        showHistory = true
+    /// Navigates back to inbox-style conversation list.
+    private func navigateToInbox() {
+        router.navigateToConversationList()
     }
 
     /// Starts a new conversation
@@ -634,8 +678,43 @@ struct ChatView: View {
         !contextPromptViewModel.showSetupForm &&
         !insightSuggestionsViewModel.showSuggestions &&
         !showContextProfile &&
-        !showSettings &&
-        !showHistory
+        !showSettings
+    }
+
+    private var shouldShowConversationLoadingState: Bool {
+        guard viewModel.messages.isEmpty else { return false }
+
+        return !hasResolvedInitialRoute ||
+            viewModel.isLoading ||
+            isOpeningRoutedConversation ||
+            router.selectedConversationId != nil ||
+            router.pendingStarterText != nil
+    }
+
+    /// Delete is only relevant when there is actual conversation content on screen.
+    private var canDeleteCurrentConversation: Bool {
+        !viewModel.messages.isEmpty
+    }
+
+    /// Opaque composer dock so chat content never shows through behind the input row.
+    private var composerDockBackground: some View {
+        VStack(spacing: 0) {
+            Rectangle()
+                .fill(
+                    colorScheme == .dark
+                        ? Color.white.opacity(0.08)
+                        : Color.black.opacity(0.07)
+                )
+                .frame(height: 0.5)
+
+            Rectangle()
+                .fill(
+                    colorScheme == .dark
+                        ? Color.black.opacity(0.94)
+                        : Color.white.opacity(0.985)
+                )
+        }
+        .ignoresSafeArea(edges: .bottom)
     }
 
     /// Dismisses keyboard from anywhere in the view hierarchy.
@@ -667,9 +746,24 @@ struct ChatView: View {
     }
 
     /// Scrolls to the bottom of the message list
-    private func scrollToBottom(proxy: ScrollViewProxy) {
-        withAnimation(.easeOut(duration: 0.2)) {
+    private func scrollToBottom(proxy: ScrollViewProxy, animated: Bool = true) {
+        if animated {
+            withAnimation(.easeOut(duration: 0.2)) {
+                proxy.scrollTo("bottom", anchor: .bottom)
+            }
+        } else {
             proxy.scrollTo("bottom", anchor: .bottom)
+        }
+    }
+
+    private func scrollToBottomDeferred(proxy: ScrollViewProxy, animated: Bool = true) {
+        DispatchQueue.main.async {
+            scrollToBottom(proxy: proxy, animated: animated)
+        }
+
+        // Second pass catches layout that finishes one frame later on initial load.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            scrollToBottom(proxy: proxy, animated: animated)
         }
     }
 }
