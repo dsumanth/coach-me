@@ -3,7 +3,7 @@
  * Story 2.3: Progressive Context Extraction
  *
  * Analyzes conversation messages to extract values, goals, and situation mentions.
- * Uses Claude Haiku for cost efficiency (extraction is not user-facing).
+ * Uses a low-cost background model for extraction (not user-facing).
  * Returns insights with confidence scores, filtering >= 0.7.
  */
 
@@ -11,8 +11,9 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { handleCors, corsHeaders } from '../_shared/cors.ts';
 import { verifyAuth, AuthorizationError } from '../_shared/auth.ts';
 import { errorResponse } from '../_shared/response.ts';
-import { calculateCost } from '../_shared/llm-client.ts';
+import { streamChatCompletion, calculateCost, type ChatMessage } from '../_shared/llm-client.ts';
 import { logUsage } from '../_shared/cost-tracker.ts';
+import { selectBackgroundModel, enforceInputTokenBudget } from '../_shared/model-routing.ts';
 
 // Request types
 interface ExtractRequest {
@@ -87,43 +88,44 @@ serve(async (req: Request) => {
       .map(m => `${m.role.toUpperCase()}: ${m.content}`)
       .join('\n\n');
 
-    // Call Anthropic API (non-streaming for extraction)
-    const apiKey = Deno.env.get('ANTHROPIC_API_KEY');
-    if (!apiKey) {
+    // Background extraction model routing
+    if (!Deno.env.get('OPENAI_API_KEY')) {
       return errorResponse('LLM service not configured', 500);
     }
 
-    const model = 'claude-haiku-4-5-20251001'; // Cost-efficient for extraction
-
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
+    const modelSelection = selectBackgroundModel('context_extraction');
+    const llmMessages: ChatMessage[] = [
+      { role: 'system', content: EXTRACTION_SYSTEM_PROMPT },
+      {
+        role: 'user',
+        content: `Analyze this conversation and extract any context about the user's values, goals, or life situation:\n\n${conversationText}`,
       },
-      body: JSON.stringify({
-        model,
-        max_tokens: 1024,
-        temperature: 0.3, // Lower temperature for consistent extraction
-        system: EXTRACTION_SYSTEM_PROMPT,
-        messages: [
-          {
-            role: 'user',
-            content: `Analyze this conversation and extract any context about the user's values, goals, or life situation:\n\n${conversationText}`,
-          },
-        ],
-      }),
-    });
+    ];
+    const budgetedMessages = enforceInputTokenBudget(llmMessages, modelSelection.inputBudgetTokens);
 
-    if (!response.ok) {
-      const error = await response.text();
-      console.error('Anthropic API error:', error);
-      return errorResponse('Failed to analyze conversation', 500);
+    let responseText = '';
+    let usage = { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 };
+    for await (const chunk of streamChatCompletion(budgetedMessages, {
+      provider: modelSelection.provider,
+      model: modelSelection.model,
+      maxTokens: modelSelection.maxOutputTokens,
+      temperature: modelSelection.temperature,
+    })) {
+      if (chunk.type === 'token' && chunk.content) {
+        responseText += chunk.content;
+      }
+      if (chunk.type === 'done' && chunk.usage) {
+        usage = chunk.usage;
+      }
+      if (chunk.type === 'error') {
+        console.error('extract-context LLM error:', chunk.error);
+        return errorResponse('Failed to analyze conversation', 500);
+      }
     }
 
-    const llmResponse = await response.json();
-    const responseText = llmResponse.content?.[0]?.text ?? '{"insights":[]}';
+    if (!responseText.trim()) {
+      responseText = '{"insights":[]}';
+    }
 
     // Parse LLM response
     let parsedInsights: { content: string; category: string; confidence: number }[] = [];
@@ -152,19 +154,18 @@ serve(async (req: Request) => {
       }));
 
     // Log usage for cost tracking
-    const usage = llmResponse.usage ?? { input_tokens: 0, output_tokens: 0 };
     const cost = calculateCost(
-      { prompt_tokens: usage.input_tokens, completion_tokens: usage.output_tokens },
-      model
+      { prompt_tokens: usage.prompt_tokens, completion_tokens: usage.completion_tokens },
+      modelSelection.model,
     );
 
     await logUsage(supabase, {
       userId,
       conversationId: conversation_id,
-      messageId: crypto.randomUUID(), // Extraction doesn't have a message ID
-      model,
-      promptTokens: usage.input_tokens,
-      completionTokens: usage.output_tokens,
+      messageId: null, // Extraction has no associated message row
+      model: modelSelection.model,
+      promptTokens: usage.prompt_tokens,
+      completionTokens: usage.completion_tokens,
       costUsd: cost,
     });
 

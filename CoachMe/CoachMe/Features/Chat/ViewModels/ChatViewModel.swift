@@ -59,11 +59,48 @@ final class ChatViewModel {
     /// Whether to show the error alert
     var showError = false
 
+    /// Story 10.1: Whether the user is rate limited (send button disabled, warm message shown)
+    var isRateLimited = false
+
+    /// Whether to show the paywall sheet (Story 6.3 — Task 4.2)
+    /// Set when a gated user attempts to send a message.
+    var showPaywall = false
+
+    /// Message content queued for sending after a successful purchase (Story 6.3 — Task 4.4)
+    var pendingMessage: String?
+
+    /// Story 11.3: Whether this chat is in discovery mode (onboarding conversation)
+    var isDiscoveryMode = false
+
+    /// Story 11.3: Whether the discovery conversation has been completed (server signaled)
+    var discoveryComplete = false
+
+    /// Story 11.5: Discovery context for personalized paywall copy generation
+    var discoveryPaywallContext: DiscoveryPaywallContext?
+
+    /// Story 11.5: Whether the user has dismissed the personalized paywall without subscribing
+    var discoveryPaywallDismissed = false
+
+    /// Story 8.3: Whether to show the push permission prompt
+    var showPushPermissionPrompt = false
+
     /// Whether to show the delete confirmation alert (Story 2.6)
     var showDeleteConfirmation = false
 
     /// Whether a deletion is in progress (Story 2.6)
     var isDeleting = false
+
+    /// Story 10.3: Whether the user is blocked (discovery complete, no subscription, no trial)
+    /// When blocked, messages are read-only and input is disabled.
+    var isTrialBlocked: Bool {
+        TrialManager.shared.isBlocked
+    }
+
+    /// Story 11.5: Whether to show the personalized paywall overlay (Task 4.3)
+    /// True when discovery is complete, user is not subscribed, and hasn't dismissed the paywall
+    var showPersonalizedPaywall: Bool {
+        discoveryComplete && !AppEnvironment.shared.subscriptionViewModel.isSubscribed && !discoveryPaywallDismissed
+    }
 
     /// Whether retry is available (partial content exists from failed stream)
     var canRetry: Bool {
@@ -93,6 +130,42 @@ final class ChatViewModel {
     /// User message IDs that failed to send and should show inline retry UI
     private var failedUserMessageIDs: Set<UUID> = []
 
+    /// Story 8.1: Timestamp of first message in current session (for duration calculation)
+    private var sessionStartTime: Date?
+
+    /// Story 8.5: Track recently signaled conversation IDs to prevent double-signaling within 1-hour window
+    private static var recentlySignaledConversations: [UUID: Date] = [:]
+
+    /// Active ViewModels with in-flight streams, keyed by conversation ID.
+    /// Allows ChatView to reuse a ViewModel when the user navigates back
+    /// to a conversation that was mid-stream, preventing lost AI responses.
+    private static var activeStreamViewModels: [UUID: ChatViewModel] = [:]
+
+    /// Returns an actively streaming ViewModel for the given conversation, if one exists.
+    static func activeViewModel(for conversationId: UUID) -> ChatViewModel? {
+        guard let vm = activeStreamViewModels[conversationId],
+              vm.isStreaming || vm.isLoading else {
+            activeStreamViewModels[conversationId] = nil
+            return nil
+        }
+        return vm
+    }
+
+    /// Story 8.3: Timer tracking inactivity for push permission prompt trigger
+    @ObservationIgnored
+    private var inactivityTimer: Task<Void, Never>?
+
+    /// Story 8.3: Minimum messages before considering a session "complete" for push prompt.
+    /// Reduced to one user/assistant exchange so prompt is not missed in shorter sessions.
+    static let sessionCompleteMessageThreshold = 2
+
+    /// Story 8.3: Inactivity duration (seconds) before triggering session-complete
+    private static let inactivityTriggerSeconds: TimeInterval = 300 // 5 minutes
+
+    /// Story 7.3: Task observing offline sync completion notifications
+    @ObservationIgnored
+    private var syncTask: Task<Void, Never>?
+
     // MARK: - Dependencies
 
     /// Chat stream service for SSE communication
@@ -113,6 +186,11 @@ final class ChatViewModel {
         self.currentConversationId = UUID()
 
         setupTokenBuffer()
+        setupSyncObserver()
+    }
+
+    deinit {
+        syncTask?.cancel()
     }
 
     // MARK: - Setup
@@ -123,12 +201,48 @@ final class ChatViewModel {
         }
     }
 
+    /// Story 7.3: Observe sync completion to refresh current conversation
+    private func setupSyncObserver() {
+        syncTask = Task { [weak self] in
+            for await _ in NotificationCenter.default.notifications(named: .offlineSyncCompleted) {
+                guard let self else { return }
+                await self.refresh()
+            }
+        }
+    }
+
     // MARK: - Actions
 
     /// Sends the current input text as a message
+    /// Story 6.3: Gates chat access behind subscription check (Task 4.1)
     func sendMessage() async {
         let trimmedInput = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedInput.isEmpty else { return }
+
+        // Story 10.3: Check TrialManager blocked state (post-discovery, no subscription)
+        if TrialManager.shared.isBlocked {
+            pendingMessage = trimmedInput
+            inputText = ""
+            showPaywall = true
+            return
+        }
+
+        // Story 6.3 — Task 4.1/4.2: Check subscription before sending
+        let subscriptionVM = AppEnvironment.shared.subscriptionViewModel
+        if subscriptionVM.shouldGateChat {
+            pendingMessage = trimmedInput
+            inputText = ""
+            showPaywall = true
+            return
+        }
+
+        // Story 11.5: Discovery-specific gating — after paywall dismissed but user hasn't subscribed
+        if discoveryPaywallDismissed && !subscriptionVM.isSubscribed {
+            pendingMessage = trimmedInput
+            inputText = ""
+            showPaywall = true
+            return
+        }
 
         guard let conversationId = currentConversationId else { return }
 
@@ -145,6 +259,14 @@ final class ChatViewModel {
         failedUserMessageIDs.remove(userMessage.id)
         inputText = ""
 
+        // Story 8.1: Track session start time on first message
+        if sessionStartTime == nil {
+            sessionStartTime = Date()
+        }
+
+        // Story 8.3: Reset inactivity timer on each outgoing message
+        resetInactivityTimer()
+
         // Start streaming state
         isLoading = true
         isStreaming = false
@@ -159,6 +281,11 @@ final class ChatViewModel {
         let task = Task {
             defer {
                 isLoading = false
+                // Unregister from active stream recovery when Task completes
+                if let id = self.currentConversationId,
+                   Self.activeStreamViewModels[id] === self {
+                    Self.activeStreamViewModels[id] = nil
+                }
             }
 
             do {
@@ -178,6 +305,11 @@ final class ChatViewModel {
                 // Start streaming after brief delay for typing indicator UX
                 isStreaming = true
 
+                // Register for stream recovery if user navigates away mid-stream
+                if let id = currentConversationId {
+                    Self.activeStreamViewModels[id] = self
+                }
+
                 for try await event in chatStreamService.streamChat(
                     message: trimmedInput,
                     conversationId: conversationId
@@ -185,7 +317,7 @@ final class ChatViewModel {
                     try Task.checkCancellation()
 
                     switch event {
-                    case .token(let content, let hasMemoryMoment, let hasPatternInsight, let hasCrisisFlag):
+                    case .token(let content, let hasMemoryMoment, let hasPatternInsight, let hasCrisisFlag, _):
                         tokenBuffer?.addToken(content)
                         // Story 2.4: Track if response contains memory moments (AC #4)
                         if hasMemoryMoment {
@@ -200,22 +332,42 @@ final class ChatViewModel {
                             currentResponseHasCrisisFlag = true
                         }
 
-                    case .done(let messageId, _):
+                    case .done(let messageId, _, _, let isDiscoveryDone, let profile):
                         tokenBuffer?.flush()
                         currentStreamMessageId = messageId
 
+                        // Story 11.3: Capture discovery_complete signal from server
+                        if isDiscoveryDone {
+                            discoveryComplete = true
+                        }
+
+                        // Story 11.5: Build DiscoveryPaywallContext from SSE metadata (Task 6.3)
+                        if isDiscoveryDone {
+                            discoveryPaywallContext = buildDiscoveryPaywallContext(from: profile)
+                        }
+
+                        // Story 8.3: Reset inactivity timer on each incoming message
+                        resetInactivityTimer()
+
+                        // Story 8.5 Review fix H1: Client safety net — strip any leaked reflection tags
+                        let cleanedContent = streamingContent
+                            .replacingOccurrences(of: "[REFLECTION_ACCEPTED]", with: "")
+                            .replacingOccurrences(of: "[REFLECTION_DECLINED]", with: "")
+                            .trimmingCharacters(in: .whitespacesAndNewlines)
+
                         // Only create assistant message if we received actual content
                         // Prevents blank bubbles from empty LLM responses
-                        if !streamingContent.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        if !cleanedContent.isEmpty {
                             let assistantMessage = ChatMessage(
                                 id: messageId,
                                 conversationId: conversationId,
                                 role: .assistant,
-                                content: streamingContent,
+                                content: cleanedContent,
                                 createdAt: Date()
                             )
                             messages.append(assistantMessage)
                             persistCurrentConversationCache()
+                            checkPushPermissionTrigger()
                             lastUserMessageContent = nil  // Clear retry state on success
                             error = nil
                         } else {
@@ -251,7 +403,7 @@ final class ChatViewModel {
                             id: currentStreamMessageId ?? UUID(),
                             conversationId: conversationId,
                             role: .assistant,
-                            content: streamingContent + "…",
+                            content: streamingContent + "\n\n[Response interrupted]",
                             createdAt: Date()
                         )
                         messages.append(assistantMessage)
@@ -288,6 +440,17 @@ final class ChatViewModel {
                 if case .httpError(let statusCode) = streamError, statusCode == 401 {
                     self.error = .sessionExpired
                     showError = true
+                } else if case .rateLimited(let isTrial, let resetDate) = streamError {
+                    // Story 10.1: Handle rate limit — show warm message, disable send (AC #5)
+                    self.isRateLimited = true
+                    self.error = .rateLimited(isTrial: isTrial, resetDate: resetDate)
+                    // Remove the user message that was optimistically added (server rejected it)
+                    messages.removeAll { $0.id == userMessage.id }
+                    persistCurrentConversationCache()
+                    // Show paywall for trial users
+                    if isTrial {
+                        showPaywall = true
+                    }
                 } else {
                     self.error = .messageFailed(streamError)
                     markUserMessageFailed(userMessage.id)
@@ -350,14 +513,129 @@ final class ChatViewModel {
         await sendMessage()
     }
 
+    /// Sends the pending message that was queued while the paywall was showing (Story 6.3 — Task 4.4).
+    /// Called after a successful purchase dismisses the paywall.
+    func sendPendingMessage() async {
+        guard let message = pendingMessage else { return }
+        pendingMessage = nil
+        inputText = message
+        await sendMessage()
+    }
+
+    /// Story 11.3: Shows a hardcoded welcome message instantly during discovery mode.
+    /// No API call — the message appears immediately so there's zero loading delay.
+    /// The user's first typed response will be sent as a regular discovery-mode message.
+    func showDiscoveryWelcomeMessage() {
+        guard isDiscoveryMode, let conversationId = currentConversationId else { return }
+
+        let welcomeMessage = ChatMessage(
+            id: UUID(),
+            conversationId: conversationId,
+            role: .assistant,
+            content: "Hey there! Welcome to CoachMe \u{2014} I\u{2019}m your personal coach, here to help you work through challenges, build better habits, and reach your goals.\n\nWhat would you like to work on today?",
+            createdAt: Date()
+        )
+        messages.append(welcomeMessage)
+        persistCurrentConversationCache()
+    }
+
     /// Dismisses the current error
     func dismissError() {
         showError = false
         error = nil
     }
 
+    /// Story 8.1: Records session engagement metrics when user leaves the conversation
+    /// Called from ChatView.onDisappear, scenePhase changes, or when starting a new conversation
+    /// Story 8.5: Added 1-hour conversation_id dedup to prevent double-signaling
+    func onSessionEnd() {
+        // Only record if user actually sent a message this session (sessionStartTime is set in sendMessage)
+        // and conversation has 2+ messages (per Dev Notes)
+        guard sessionStartTime != nil,
+              messages.count >= 2,
+              let conversationId = currentConversationId else { return }
+
+        // Story 8.5: Prevent double-signaling within 1-hour window per conversation
+        let oneHourAgo = Date().addingTimeInterval(-3600)
+        // Clean up stale entries
+        Self.recentlySignaledConversations = Self.recentlySignaledConversations.filter { $0.value > oneHourAgo }
+        // Check if already signaled
+        if let lastSignaled = Self.recentlySignaledConversations[conversationId], lastSignaled > oneHourAgo {
+            sessionStartTime = nil
+            return
+        }
+
+        let userMessages = messages.filter { $0.role == .user }
+        guard !userMessages.isEmpty else { return }
+
+        let messageCount = messages.count
+        let totalUserChars = userMessages.reduce(0) { $0 + $1.content.count }
+        let avgMessageLength = totalUserChars / userMessages.count
+
+        // Duration from session start (or first message timestamp) to now
+        let startTime = sessionStartTime ?? messages.first?.createdAt ?? Date()
+        let durationSeconds = Int(Date().timeIntervalSince(startTime))
+
+        // Story 8.5: Mark as signaled before async call to prevent races
+        Self.recentlySignaledConversations[conversationId] = Date()
+
+        // Fire-and-forget — signal failure must never affect UX
+        Task {
+            try? await LearningSignalService.shared.recordSessionEngagement(
+                conversationId: conversationId,
+                messageCount: messageCount,
+                avgMessageLength: avgMessageLength,
+                durationSeconds: durationSeconds
+            )
+        }
+
+        // Reset so we don't double-fire
+        sessionStartTime = nil
+    }
+
+    /// Story 8.3: Checks if the push permission prompt should be shown after session completion.
+    /// A session is "complete" when at least one exchange happened (2 messages total),
+    /// then checked on assistant response completion, app background, or 5min inactivity.
+    func checkPushPermissionTrigger() {
+        let hasEnoughMessages = messages.count >= Self.sessionCompleteMessageThreshold
+        guard hasEnoughMessages else { return }
+
+        // Evaluate prompt conditions synchronously so app-background transitions
+        // don't suspend the task before state updates.
+        let shouldPrompt = PushPermissionService.shared.shouldRequestPermission(firstSessionComplete: true)
+        if shouldPrompt {
+            showPushPermissionPrompt = true
+        }
+
+        // Server profile update is non-blocking and can happen asynchronously.
+        Task {
+            if let userId = await AuthService.shared.currentUserId {
+                try? await ContextRepository.shared.markFirstSessionComplete(userId: userId)
+            }
+        }
+    }
+
+    /// Story 8.3: Resets the inactivity timer. Called whenever a message is sent or received.
+    func resetInactivityTimer() {
+        inactivityTimer?.cancel()
+        inactivityTimer = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(Self.inactivityTriggerSeconds))
+            guard !Task.isCancelled else { return }
+            self?.checkPushPermissionTrigger()
+        }
+    }
+
+    /// Story 8.3: Handle app going to background — check push permission trigger
+    func onAppBackgrounded() {
+        inactivityTimer?.cancel()
+        checkPushPermissionTrigger()
+    }
+
     /// Starts a new conversation, clearing all messages
     func startNewConversation() {
+        // Story 8.1: Record engagement for the ending conversation
+        onSessionEnd()
+
         resetStateForConversation(id: UUID(), isPersisted: false)
         messages = []
     }
@@ -365,6 +643,10 @@ final class ChatViewModel {
     /// Loads an existing conversation by fetching its messages (Story 3.6)
     /// - Parameter id: The conversation ID to load
     func loadConversation(id: UUID, alreadyPrimedFromCache: Bool = false) async {
+        // If already actively streaming for this conversation, don't interrupt
+        if currentConversationId == id && (isStreaming || isLoading) {
+            return
+        }
         resetStateForConversation(id: id, isPersisted: true)
 
         var hasCachedMessages = alreadyPrimedFromCache && !messages.isEmpty
@@ -385,6 +667,19 @@ final class ChatViewModel {
             isLoading = false
         }
 
+        // Story 7.1: If offline, fall back to SwiftData cache
+        guard NetworkMonitor.shared.isConnected else {
+            if !hasCachedMessages {
+                let swiftDataMessages = OfflineCacheService.shared.getCachedMessages(conversationId: id)
+                if !swiftDataMessages.isEmpty {
+                    messages = swiftDataMessages.map { $0.toChatMessage() }
+                    hasCachedMessages = true
+                }
+            }
+            isLoading = false
+            return
+        }
+
         defer { isLoading = false }
 
         do {
@@ -393,13 +688,25 @@ final class ChatViewModel {
         } catch let convError as ConversationService.ConversationError {
             // If cache is already shown, avoid interrupting with an alert.
             if !hasCachedMessages {
-                self.error = .messageFailed(convError)
-                showError = true
+                // Story 7.1: Fall back to SwiftData on fetch failure
+                let swiftDataMessages = OfflineCacheService.shared.getCachedMessages(conversationId: id)
+                if !swiftDataMessages.isEmpty {
+                    messages = swiftDataMessages.map { $0.toChatMessage() }
+                } else {
+                    self.error = .messageFailed(convError)
+                    showError = true
+                }
             }
         } catch {
             if !hasCachedMessages {
-                self.error = .messageFailed(error)
-                showError = true
+                // Story 7.1: Fall back to SwiftData on fetch failure
+                let swiftDataMessages = OfflineCacheService.shared.getCachedMessages(conversationId: id)
+                if !swiftDataMessages.isEmpty {
+                    messages = swiftDataMessages.map { $0.toChatMessage() }
+                } else {
+                    self.error = .messageFailed(error)
+                    showError = true
+                }
             }
         }
     }
@@ -430,17 +737,11 @@ final class ChatViewModel {
         return false
     }
 
-    /// Refreshes the conversation (pull-to-refresh)
-    /// Will integrate with sync service in Story 7.3
+    /// Story 7.3: Refreshes the current conversation from the server.
+    /// Skips refresh during active streaming to avoid UI disruption.
     func refresh() async {
-        // Placeholder for sync functionality
-        // Will fetch any missed messages from server in Story 7.3
-        #if DEBUG
-        print("ChatViewModel: Refresh triggered - sync will be implemented in Story 7.3")
-        #endif
-
-        // Simulate a brief refresh delay for UX feedback
-        try? await Task.sleep(nanoseconds: 500_000_000)
+        guard let conversationId = currentConversationId, !isStreaming else { return }
+        await loadConversation(id: conversationId)
     }
 
     // MARK: - Conversation Deletion (Story 2.6)
@@ -516,7 +817,13 @@ final class ChatViewModel {
 
     /// Resets all chat state for loading a new or existing conversation.
     private func resetStateForConversation(id: UUID, isPersisted: Bool) {
+        // Unregister from active stream registry for the current conversation
+        if let previousId = currentConversationId,
+           Self.activeStreamViewModels[previousId] === self {
+            Self.activeStreamViewModels[previousId] = nil
+        }
         currentSendTask?.cancel()
+        inactivityTimer?.cancel()  // Story 8.3
         currentStreamMessageId = nil
         currentConversationId = id
         isConversationPersisted = isPersisted
@@ -528,9 +835,18 @@ final class ChatViewModel {
         currentResponseHasPatternInsights = false
         currentResponseHasCrisisFlag = false
         showCrisisResources = false
+        isRateLimited = false  // Story 10.1
+        showPaywall = false
+        isDiscoveryMode = false  // Story 11.3
+        discoveryComplete = false  // Story 11.3
+        discoveryPaywallContext = nil  // Story 11.5
+        discoveryPaywallDismissed = false  // Story 11.5
+        showPushPermissionPrompt = false  // Story 8.3
+        pendingMessage = nil
         tokenBuffer?.reset()
         lastUserMessageContent = nil
         failedUserMessageIDs.removeAll()
+        sessionStartTime = nil  // Story 8.1: Reset session tracking
         error = nil
         showError = false
     }
@@ -543,9 +859,79 @@ final class ChatViewModel {
         isStreaming = false
     }
 
+    /// Story 11.5: Builds DiscoveryPaywallContext from SSE discovery profile data.
+    /// Extracts first coaching domain and first key theme for paywall copy generation.
+    /// Returns empty context (triggering fallback copy) when profile is nil.
+    private func buildDiscoveryPaywallContext(from profile: ChatStreamService.StreamEvent.DiscoveryProfileData?) -> DiscoveryPaywallContext {
+        if let profile {
+            return DiscoveryPaywallContext(
+                coachingDomain: profile.coachingDomains?.first,
+                ahaInsight: profile.ahaInsight,
+                keyTheme: profile.keyThemes?.first,
+                userName: nil
+            )
+        }
+        return DiscoveryPaywallContext(coachingDomain: nil, ahaInsight: nil, keyTheme: nil, userName: nil)
+    }
+
     /// Persists in-memory messages for the current conversation so thread opens instantly next time.
+    /// Also writes to SwiftData for offline access (Story 7.1).
     private func persistCurrentConversationCache() {
         guard let conversationId = currentConversationId else { return }
         ChatMessageCache.save(messages: messages, conversationId: conversationId)
+        persistConversationListCacheSnapshot(messages: messages, conversationId: conversationId)
+
+        // Story 7.1: Also persist to SwiftData for offline access (non-blocking)
+        let messagesToCache = messages
+        Task { OfflineCacheService.shared.cacheMessages(messagesToCache, forConversation: conversationId) }
+    }
+
+    /// Updates the inbox cache immediately so conversation history survives app relaunches
+    /// even before the next cloud conversation-list fetch completes.
+    private func persistConversationListCacheSnapshot(messages: [ChatMessage], conversationId: UUID) {
+        guard let userId = AuthService.shared.currentUser?.id else { return }
+
+        let now = Date()
+        let existingPayload = ConversationListCache.load()
+        let existingConversation = existingPayload?.conversations.first { $0.id == conversationId }
+        let inferredTitle = existingConversation?.title
+            ?? messages.first(where: { $0.role == .user }).map { String($0.content.prefix(50)) }
+
+        let conversation = ConversationService.Conversation(
+            id: conversationId,
+            userId: userId,
+            title: inferredTitle,
+            domain: existingConversation?.domain,
+            lastMessageAt: messages.last?.createdAt ?? existingConversation?.lastMessageAt ?? now,
+            messageCount: max(existingConversation?.messageCount ?? 0, messages.count),
+            createdAt: existingConversation?.createdAt ?? messages.first?.createdAt ?? now,
+            updatedAt: now
+        )
+
+        var conversations = existingPayload?.conversations.filter { $0.id != conversationId } ?? []
+        conversations.append(conversation)
+        conversations.sort { ($0.lastMessageAt ?? .distantPast) > ($1.lastMessageAt ?? .distantPast) }
+
+        var previews = existingPayload?.previews ?? [:]
+        var roles = existingPayload?.roles ?? [:]
+        if let last = messages.last {
+            previews[conversationId] = normalizedPreview(last.content)
+            roles[conversationId] = last.role
+        }
+
+        let payload = ConversationListCachePayload(
+            conversations: conversations,
+            previews: previews,
+            roles: roles,
+            cachedAt: now
+        )
+        ConversationListCache.save(payload)
+    }
+
+    private func normalizedPreview(_ text: String) -> String {
+        text
+            .replacingOccurrences(of: "\n", with: " ")
+            .replacingOccurrences(of: "\t", with: " ")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }

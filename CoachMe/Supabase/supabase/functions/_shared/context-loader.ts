@@ -73,6 +73,12 @@ export interface UserContext {
   situation: ContextSituation;
   confirmedInsights: ExtractedInsight[];
   hasContext: boolean;
+  // Story 11.4: Discovery session fields for first-paid-session prompt injection
+  discoveryCompletedAt: string | null;
+  ahaInsight: string | null;
+  coachingDomains: string[];
+  communicationStyle: string | null;
+  vision: string | null;
 }
 
 /** Raw row from context_profiles table */
@@ -81,6 +87,12 @@ interface ContextProfileRow {
   goals: ContextGoal[] | null;
   situation: ContextSituation | null;
   extracted_insights: ExtractedInsight[] | null;
+  // Story 11.4: Discovery fields
+  discovery_completed_at: string | null;
+  aha_insight: string | null;
+  coaching_domains: string[] | null;
+  communication_style: string | null;
+  vision: string | null;
 }
 
 // MARK: - Context Loading
@@ -109,13 +121,18 @@ export async function loadUserContext(
     situation: {},
     confirmedInsights: [],
     hasContext: false,
+    discoveryCompletedAt: null,
+    ahaInsight: null,
+    coachingDomains: [],
+    communicationStyle: null,
+    vision: null,
   };
 
   try {
     // Single query to get all context data
     const { data: profile, error } = await supabase
       .from('context_profiles')
-      .select('values, goals, situation, extracted_insights')
+      .select('values, goals, situation, extracted_insights, discovery_completed_at, aha_insight, coaching_domains, communication_style, vision')
       .eq('user_id', userId)
       .single();
 
@@ -163,6 +180,11 @@ export async function loadUserContext(
       situation,
       confirmedInsights,
       hasContext,
+      discoveryCompletedAt: row.discovery_completed_at ?? null,
+      ahaInsight: row.aha_insight ?? null,
+      coachingDomains: row.coaching_domains ?? [],
+      communicationStyle: row.communication_style ?? null,
+      vision: row.vision ?? null,
     };
   } catch (error) {
     // Log but don't throw - context loading should never block chat

@@ -46,7 +46,7 @@ so that **I can keep threads organized and return to past coaching sessions**.
 
 - [x] Task 4: Create domain badge component (AC: #5)
   - [x] 4.1 Create a `DomainBadge.swift` component in `Core/UI/Components/` — small pill/tag showing domain name with domain-specific color
-  - [x] 4.2 Define a `CoachingDomain` enum (or constants) in `Core/Models/` centralizing the 7 known domains ("life", "career", "relationships", "mindset", "creativity", "fitness", "leadership") with display names and colors from `Colors.swift`
+  - [x] 4.2 Use the existing `CoachingDomain` enum defined in `Core/Constants/CoachingDomain.swift` — centralizes the 7 known domains ("life", "career", "relationships", "mindset", "creativity", "fitness", "leadership") with display names and colors from `Core/UI/Theme/Colors.swift` (`domainLife`, `domainCareer`, etc. with both light and dark mode variants)
   - [x] 4.3 Handle nil domain: show no badge (omit entirely). Handle unknown-but-not-nil domain: show raw domain string capitalized with a neutral/default color
 
 - [x] Task 5: Update Router for conversation list navigation (AC: #2, #3)

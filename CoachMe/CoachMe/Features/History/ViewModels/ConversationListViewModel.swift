@@ -47,6 +47,12 @@ final class ConversationListViewModel {
     /// True when the list on screen is coming from local cache while cloud refresh is in-flight.
     var isShowingCachedData = false
 
+    // MARK: - Private State
+
+    /// Story 7.3: Task observing offline sync completion notifications
+    @ObservationIgnored
+    private var syncTask: Task<Void, Never>?
+
     // MARK: - Dependencies
 
     private let conversationService: any ConversationServiceProtocol
@@ -55,6 +61,23 @@ final class ConversationListViewModel {
 
     init(conversationService: any ConversationServiceProtocol = ConversationService.shared) {
         self.conversationService = conversationService
+        setupSyncObserver()
+    }
+
+    deinit {
+        syncTask?.cancel()
+    }
+
+    // MARK: - Setup
+
+    /// Story 7.3: Observe sync completion to refresh conversation list
+    private func setupSyncObserver() {
+        syncTask = Task { [weak self] in
+            for await _ in NotificationCenter.default.notifications(named: .offlineSyncCompleted) {
+                guard let self else { return }
+                await self.loadConversations()
+            }
+        }
     }
 
     // MARK: - Actions
@@ -72,6 +95,16 @@ final class ConversationListViewModel {
             isShowingCachedData = !payload.conversations.isEmpty
         }
 
+        // Story 7.1: If offline, fall back to SwiftData cache instead of cloud
+        guard NetworkMonitor.shared.isConnected else {
+            if conversations.isEmpty {
+                let cached = OfflineCacheService.shared.getCachedConversations()
+                conversations = cached.map { $0.toConversation() }
+                isShowingCachedData = !conversations.isEmpty
+            }
+            return
+        }
+
         // 2) Source of truth refresh: cloud.
         do {
             conversations = try await conversationService.fetchConversations()
@@ -82,13 +115,27 @@ final class ConversationListViewModel {
         } catch let convError as ConversationService.ConversationError {
             // If cache is visible, keep UX stable and avoid interruption.
             if conversations.isEmpty {
-                self.error = convError
-                showError = true
+                // Story 7.1: Fall back to SwiftData cache on fetch failure
+                let cached = OfflineCacheService.shared.getCachedConversations()
+                if !cached.isEmpty {
+                    conversations = cached.map { $0.toConversation() }
+                    isShowingCachedData = true
+                } else {
+                    self.error = convError
+                    showError = true
+                }
             }
         } catch {
             if conversations.isEmpty {
-                self.error = .fetchFailed(error.localizedDescription)
-                showError = true
+                // Story 7.1: Fall back to SwiftData cache on fetch failure
+                let cached = OfflineCacheService.shared.getCachedConversations()
+                if !cached.isEmpty {
+                    conversations = cached.map { $0.toConversation() }
+                    isShowingCachedData = true
+                } else {
+                    self.error = .fetchFailed(error.localizedDescription)
+                    showError = true
+                }
             }
         }
     }

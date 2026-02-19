@@ -1,0 +1,4 @@
+[functions.extract-context]
+# Gateway verify_jwt disabled to support new sb_publishable_ / sb_secret_ key formats.
+# JWT verification is handled in _shared/auth.ts.
+verify_jwt = false

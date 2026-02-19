@@ -1,0 +1,3 @@
+[functions.push-trigger]
+# Gateway verify_jwt disabled so cron/service-role auth can be handled in-function.
+verify_jwt = false

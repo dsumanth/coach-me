@@ -242,6 +242,9 @@ final class ConversationService: ConversationServiceProtocol {
                 .eq("user_id", value: userId.uuidString)
                 .execute()
 
+            // Story 7.1: Also remove from SwiftData cache (non-blocking)
+            Task { OfflineCacheService.shared.deleteCachedConversation(id: id) }
+
             #if DEBUG
             print("ConversationService: Deleted conversation \(id)")
             #endif
@@ -305,6 +308,9 @@ final class ConversationService: ConversationServiceProtocol {
             print("ConversationService: Fetched \(conversations.count) conversations")
             #endif
 
+            // Story 7.1: Cache conversations for offline access (non-blocking)
+            Task { OfflineCacheService.shared.cacheConversations(conversations) }
+
             return conversations
         } catch {
             #if DEBUG
@@ -335,6 +341,9 @@ final class ConversationService: ConversationServiceProtocol {
             #if DEBUG
             print("ConversationService: Fetched \(messages.count) messages for conversation \(conversationId)")
             #endif
+
+            // Story 7.1: Cache messages for offline access (non-blocking)
+            Task { OfflineCacheService.shared.cacheMessages(messages, forConversation: conversationId) }
 
             return messages
         } catch {

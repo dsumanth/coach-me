@@ -59,7 +59,7 @@ So that **I can tune domain behavior (tone, methodology, system prompt, personal
 - [x] Task 6: Update domain-router.ts to use config keywords (AC: #7)
   - [x] 6.1 Import `getDomainKeywords` from `domain-configs.ts`
   - [x] 6.2 Replace any hardcoded keyword arrays with config-driven keyword loading
-  - [x] 6.3 Verify dynamically-added domains work end-to-end: new JSON file in `_shared/domain-configs/` (canonical source) → build phase auto-syncs to `Resources/DomainConfigs/` → auto-discovered by both platforms → keywords available to router → routing works on iOS and Edge → no code changes needed
+  - [x] 6.3 Verify dynamically-added domains work end-to-end: operator adds a new JSON config file to `_shared/domain-configs/` (canonical source for Edge Functions) → Xcode build-phase sync script copies it to `Resources/DomainConfigs/` (iOS Bundle) → `loadDomainConfigs()` discovers the new file at next Edge Function cold start → `DomainConfigService` discovers the new file at next iOS app launch → keywords available to router → routing works on both iOS and Edge Functions → no Swift or TypeScript code changes needed, only a new JSON file addition per AC #3
 - [x] Task 7: Config synchronization between iOS and Edge Functions (AC: #3)
   - [x] 7.1 Designate `_shared/domain-configs/` as the canonical source directory; `Resources/DomainConfigs/` contains copies for iOS Bundle inclusion
   - [x] 7.2 Create `scripts/sync-domain-configs.sh` — copies all JSON files from `_shared/domain-configs/` to `Resources/DomainConfigs/`, logs diff if files diverge
@@ -105,7 +105,7 @@ So that **I can tune domain behavior (tone, methodology, system prompt, personal
 
 ### Domain Config JSON Schema (Full)
 
-Story 3-1 creates initial configs with basic fields. This story extends them to the full schema:
+Story 3-1 creates initial configs with basic fields. This story extends them to the full schema. **All Bundle JSON config keys use camelCase** (e.g., `systemPromptAddition`, `domainKeywords`). Reserve `snake_case` exclusively for Supabase database model columns. See Coding Standards section below for details.
 
 ```json
 {
@@ -199,7 +199,7 @@ const keywords = getDomainKeywords('career'); // from domain-configs.ts
 
 - **iOS**: Domain config loading **<100ms** total for all 8 configs (NFR3). Loaded once at service init, cached in-memory dictionary. No network calls (bundled JSON).
 - **Edge Function cold start**: JSON files read from disk + parsed once at module init. Expected **<50ms** for 8 small JSON files on Deno. Cached in module-level `Map` after first load.
-- **Edge Function warm request**: O(1) map access, **<1ms** — reads from cached `Map`, no file I/O on subsequent requests.
+- **Edge Function warm request**: O(1) map access, **<1ms** — reads from cached `Map`, no file I/O on subsequent requests. Note: Edge Functions load and parse JSON files once at cold start (top-level `await loadDomainConfigs()`), then cache the parsed configs in a module-level `Map` for the lifetime of the instance. The O(1) / <1ms claim applies only to warm requests reading from this in-memory cache, not to the initial cold-start load.
 - **Single source of truth**: `_shared/domain-configs/` is the canonical directory. An Xcode build-phase script copies configs into `Resources/DomainConfigs/` for iOS Bundle inclusion. A CI validation script (`scripts/validate-domain-configs.sh`) verifies both locations contain identical files. Edge Functions read from `_shared/domain-configs/` at deploy/init.
 
 ### Project Structure Notes

@@ -91,30 +91,33 @@ development_status:
   5-4-creator-dashboard: backlog
   epic-5-retrospective: optional
 
-  # ── Epic 6: Payments, Auth Enhancements & Account Management (6 stories) ──
-  epic-6: backlog
-  6-1-revenuecat-integration: backlog
-  6-2-free-trial-experience: backlog
-  6-3-subscription-purchase-flow: backlog
-  6-4-subscription-management: backlog
-  6-5-biometric-unlock: backlog
-  6-6-account-deletion: backlog
+  # ── Epic 6: Payments, Auth Enhancements & Account Management (5 stories) ──
+  epic-6: in-progress
+  6-1-revenuecat-integration: review
+  6-2-free-trial-experience: review
+  6-3-subscription-purchase-flow: review
+  6-4-subscription-management: review
+  6-6-account-deletion: review
   epic-6-retrospective: optional
 
   # ── Epic 7: Offline Support & Data Sync (4 stories) ──
-  epic-7: backlog
-  7-1-offline-data-caching-with-swiftdata: backlog
-  7-2-offline-warning-banner: backlog
-  7-3-automatic-sync-on-reconnect: backlog
-  7-4-sync-conflict-resolution: backlog
+  epic-7: in-progress
+  7-1-offline-data-caching-with-swiftdata: review
+  7-2-offline-warning-banner: review
+  7-3-automatic-sync-on-reconnect: review
+  7-4-sync-conflict-resolution: done
   epic-7-retrospective: optional
 
-  # ── Epic 8: Engagement & Push Notifications (4 stories) ──
-  epic-8: backlog
-  8-1-apns-push-infrastructure: backlog
-  8-2-permission-request-timing: backlog
-  8-3-context-aware-check-in-triggers: backlog
-  8-4-notification-preferences: backlog
+  # ── Epic 8: Adaptive Coaching Intelligence & Proactive Engagement (8 stories) ──
+  epic-8: in-progress
+  8-1-learning-signals-infrastructure: done
+  8-2-apns-push-infrastructure: done
+  8-3-push-permission-and-notification-preferences: done
+  8-4-in-conversation-pattern-recognition-engine: done
+  8-5-progress-tracking-and-coaching-reflections: done
+  8-6-coaching-style-adaptation: done
+  8-7-smart-proactive-push-notifications: done
+  8-8-enhanced-profile-learned-knowledge-display: done
   epic-8-retrospective: optional
 
   # ── Epic 9: Operator Tools & App Store Launch (8 stories) ──
@@ -128,3 +131,21 @@ development_status:
   9-7-app-icon-and-launch-screen: backlog
   9-8-final-qa-and-testflight-distribution: backlog
   epic-9-retrospective: optional
+
+  # ── Epic 10: Usage Controls & Trial Protection (5 stories) ──
+  epic-10: in-progress
+  10-1-message-rate-limiting-infrastructure: review
+  10-2-device-fingerprint-tracking-and-trial-abuse-prevention: review
+  10-3-paid-trial-activation-after-discovery: review
+  10-4-paid-trial-configuration: review
+  10-5-usage-transparency-ui: review
+  epic-10-retrospective: optional
+
+  # ── Epic 11: Onboarding Discovery & Conversion (5 stories) ──
+  epic-11: in-progress
+  11-1-discovery-session-system-prompt: done
+  11-2-discovery-mode-edge-function: done
+  11-3-onboarding-flow-ui: done
+  11-4-discovery-to-profile-pipeline: done
+  11-5-personalized-paywall: done
+  epic-11-retrospective: optional

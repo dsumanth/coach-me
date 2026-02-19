@@ -78,7 +78,6 @@ struct DisclaimerAccessibilityTests {
     @Test("Disclaimer text content is correct")
     func disclaimerTextContent() {
         // Verify the canonical disclaimer string matches FR19
-        let expectedText = "AI coaching, not therapy or mental health treatment"
         // The text is hardcoded in DisclaimerView — verify it's the correct string
         // by checking the view can be created (compilation verifies the text exists)
         let view = DisclaimerView()

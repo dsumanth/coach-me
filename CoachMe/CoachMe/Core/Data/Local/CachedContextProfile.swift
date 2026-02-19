@@ -23,10 +23,18 @@ final class CachedContextProfile {
     /// Timestamp of last sync with Supabase
     var lastSyncedAt: Date
 
-    init(userId: UUID, profileData: Data, lastSyncedAt: Date = Date()) {
+    /// Story 7.4: Timestamp of last local edit while offline — nil when synced
+    var localUpdatedAt: Date?
+
+    /// Story 7.4: Sync status — "synced", "pending", or "conflict"
+    var syncStatus: String = "synced"
+
+    init(userId: UUID, profileData: Data, lastSyncedAt: Date = Date(), localUpdatedAt: Date? = nil, syncStatus: String = "synced") {
         self.userId = userId
         self.profileData = profileData
         self.lastSyncedAt = lastSyncedAt
+        self.localUpdatedAt = localUpdatedAt
+        self.syncStatus = syncStatus
     }
 
     // MARK: - Convenience Methods

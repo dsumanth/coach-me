@@ -28,11 +28,43 @@ struct ChatView: View {
     /// Router for navigation (Story 3.6)
     @Environment(\.router) private var router
 
+    /// Onboarding coordinator for discovery flow (Story 11.3)
+    @Environment(\.onboardingCoordinator) private var onboardingCoordinator
+
+    /// Whether to show the discovery paywall overlay (Story 11.3 → 11.5: PersonalizedPaywallView)
+    @State private var showDiscoveryPaywall = false
+
+    /// Hoisted VM for discovery paywall overlay — persists across view updates (Story 11.5)
+    @State private var discoveryPaywallVM: PersonalizedPaywallViewModel?
+
+    /// Whether to show the return paywall sheet (Story 11.5: user dismissed first paywall, taps send)
+    @State private var showReturnPaywall = false
+
     /// Whether to show the context profile sheet (Story 2.5)
     @State private var showContextProfile = false
 
     /// Whether to show the settings view (Story 2.6)
     @State private var showSettings = false
+
+    /// Whether to show the paywall sheet (Story 6.2)
+    @State private var showPaywall = false
+
+    /// Usage tracking view model (Story 10.5)
+    @State private var usageViewModel = UsageViewModel()
+
+    /// Whether to show the usage detail sheet (Story 10.5)
+    @State private var showUsageDetail = false
+
+    /// Shared subscription state (Story 6.2)
+    private var subscriptionViewModel: SubscriptionViewModel {
+        AppEnvironment.shared.subscriptionViewModel
+    }
+
+    /// Scene phase for detecting background transitions (Story 8.3)
+    @Environment(\.scenePhase) private var scenePhase
+
+    /// Network connectivity monitor (Story 7.2)
+    private var networkMonitor = NetworkMonitor.shared
 
     /// True while opening a routed conversation so we avoid flashing the empty-state.
     @State private var isOpeningRoutedConversation = false
@@ -57,17 +89,32 @@ struct ChatView: View {
         viewModel: ChatViewModel = ChatViewModel(),
         voiceViewModel: VoiceInputViewModel = VoiceInputViewModel(),
         initialConversationId: UUID? = nil,
-        initialMessages: [ChatMessage]? = nil
+        initialMessages: [ChatMessage]? = nil,
+        isDiscoveryMode: Bool = false
     ) {
-        if let initialConversationId, let initialMessages {
-            // Prime preloaded thread before first render to prevent chat-body fade.
-            _ = viewModel.primeConversationFromPreloaded(id: initialConversationId, messages: initialMessages)
-        } else if let initialConversationId {
-            // Fallback: prime from local cache before first render.
-            _ = viewModel.primeConversationFromCache(id: initialConversationId)
+        // Reuse an active ViewModel if the conversation has an in-flight stream.
+        // This prevents losing AI responses when the user navigates away mid-stream
+        // and returns to the same conversation.
+        if let initialConversationId,
+           let activeVM = ChatViewModel.activeViewModel(for: initialConversationId) {
+            _viewModel = State(initialValue: activeVM)
+        } else {
+            if let initialConversationId, let initialMessages {
+                // Prime preloaded thread before first render to prevent chat-body fade.
+                _ = viewModel.primeConversationFromPreloaded(id: initialConversationId, messages: initialMessages)
+            } else if let initialConversationId {
+                // Fallback: prime from local cache before first render.
+                _ = viewModel.primeConversationFromCache(id: initialConversationId)
+            }
+            // Story 11.3: Set discovery mode and add welcome message before first render.
+            // Must happen BEFORE _viewModel = State(...) so messages is never empty
+            // on the first frame — prevents the EmptyConversationView flash.
+            if isDiscoveryMode {
+                viewModel.isDiscoveryMode = true
+                viewModel.showDiscoveryWelcomeMessage()
+            }
+            _viewModel = State(initialValue: viewModel)
         }
-
-        _viewModel = State(initialValue: viewModel)
         _voiceViewModel = State(initialValue: voiceViewModel)
     }
 
@@ -80,6 +127,21 @@ struct ChatView: View {
             VStack(spacing: 0) {
                 // Adaptive toolbar
                 chatToolbar
+
+                // Banner priority: Offline > UsageIndicator > TrialBanner (Story 7.2, 10.5)
+                if !networkMonitor.isConnected {
+                    OfflineBanner()
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                } else if usageViewModel.displayState != .hidden {
+                    // Story 10.5: Usage indicator — handles both paid threshold and trial message display
+                    UsageIndicator(viewModel: usageViewModel, showDetail: $showUsageDetail)
+                } else if case .trialActive = TrialManager.shared.currentState {
+                    // Story 10.3: Trial banner fallback — only when usage hasn't loaded yet
+                    TrialBanner(
+                        onViewPlans: { showPaywall = true }
+                    )
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                }
 
                 // Message list or empty state
                 Group {
@@ -96,6 +158,7 @@ struct ChatView: View {
                 .animation(nil, value: shouldShowConversationLoadingState)
                 .animation(nil, value: viewModel.messages.isEmpty)
             }
+            .animation(.easeInOut(duration: DesignConstants.Animation.standard), value: networkMonitor.isConnected)
 
             if contextPromptViewModel.showPrompt {
                 contextPromptOverlay
@@ -104,7 +167,27 @@ struct ChatView: View {
             }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            if shouldShowComposer {
+            if viewModel.isTrialBlocked && shouldShowComposer {
+                // Story 10.3: Post-discovery blocked — show warm message and paywall
+                trialExpiredPrompt
+                    .background(composerDockBackground)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            } else if viewModel.isRateLimited && shouldShowComposer {
+                // Story 10.1: Rate limited — show warm message instead of composer (AC #5)
+                rateLimitedPrompt
+                    .background(composerDockBackground)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            } else if subscriptionViewModel.shouldGateChat && shouldShowComposer {
+                // Trial expired gate — show gentle prompt instead of composer (Story 6.2)
+                trialExpiredPrompt
+                    .background(composerDockBackground)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            } else if viewModel.discoveryPaywallDismissed && !subscriptionViewModel.isSubscribed && shouldShowComposer {
+                // Story 11.5: Discovery-gated — disable composer, route to personalized return paywall
+                discoveryGatedPrompt
+                    .background(composerDockBackground)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            } else if shouldShowComposer {
                 VStack(spacing: 0) {
                     if contextPromptViewModel.showSuggestionChip {
                         contextSuggestionChip
@@ -221,6 +304,17 @@ struct ChatView: View {
         )) {
             if let userId = contextPromptViewModel.userId {
                 ContextProfileView(userId: userId)
+            } else {
+                VStack(spacing: 12) {
+                    Text("Unable to load profile")
+                        .font(.headline)
+                        .foregroundStyle(Color.adaptiveText(colorScheme))
+                    Text("Please sign in to view your profile.")
+                        .font(.subheadline)
+                        .foregroundStyle(Color.adaptiveText(colorScheme, isPrimary: false))
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .presentationDetents([.medium])
             }
         }
         // Settings sheet (Story 2.6)
@@ -229,9 +323,91 @@ struct ChatView: View {
                 SettingsView()
             }
         }
+        // Paywall sheet (Story 6.2 + 6.3 + 11.3)
+        .sheet(isPresented: $showPaywall) {
+            PaywallView(
+                subscriptionViewModel: subscriptionViewModel,
+                context: subscriptionViewModel.currentPaywallContext,
+                packages: subscriptionViewModel.subscriptionOnlyPackages
+            ) { purchaseSucceeded in
+                if purchaseSucceeded {
+                    // Story 11.3: Notify onboarding coordinator of subscription
+                    if viewModel.isDiscoveryMode {
+                        onboardingCoordinator.onSubscriptionConfirmed()
+                        onboardingCoordinator.completeOnboarding()
+                    }
+
+                    // Story 6.3 — Task 4.4: Handle post-purchase via explicit callback
+                    if viewModel.pendingMessage != nil {
+                        Task {
+                            await viewModel.sendPendingMessage()
+                        }
+                    }
+                } else {
+                    viewModel.pendingMessage = nil
+                }
+            }
+        }
+        // Story 11.5: Return paywall sheet — shown when dismissed user taps send
+        .sheet(isPresented: $showReturnPaywall) {
+            NavigationStack {
+                PersonalizedPaywallView(
+                    viewModel: PersonalizedPaywallViewModel(
+                        presentation: .returnPresentation(discoveryContext: viewModel.discoveryPaywallContext)
+                    ),
+                    subscriptionViewModel: subscriptionViewModel,
+                    onPurchaseCompleted: { success in
+                        if success {
+                            showReturnPaywall = false
+                            onboardingCoordinator.onSubscriptionConfirmed()
+                            onboardingCoordinator.completeOnboarding()
+                            if viewModel.pendingMessage != nil {
+                                Task {
+                                    await viewModel.sendPendingMessage()
+                                }
+                            }
+                        }
+                    },
+                    onDismiss: {
+                        showReturnPaywall = false
+                    }
+                )
+            }
+        }
         // Crisis resource sheet (Story 4.2)
         .sheet(isPresented: $viewModel.showCrisisResources) {
             CrisisResourceSheet()
+        }
+        // Push permission prompt sheet (Story 8.3)
+        .sheet(isPresented: $viewModel.showPushPermissionPrompt) {
+            PushPermissionPromptView(
+                onAccept: {
+                    Task {
+                        // Request iOS permission (records the request regardless of outcome)
+                        await PushPermissionService.shared.requestPermissionIfNeeded()
+
+                        // Save default notification preferences regardless of grant/deny.
+                        // The user expressed interest — store their preference even if iOS
+                        // permission was denied so Settings shows correct state.
+                        if let userId = await AuthService.shared.currentUserId {
+                            do {
+                                var profile = try await ContextRepository.shared.fetchProfile(userId: userId)
+                                profile.notificationPreferences = .default()
+                                try await ContextRepository.shared.updateProfile(profile)
+                            } catch {
+                                #if DEBUG
+                                print("PushPermissionPrompt: Failed to save notification preferences — \(error.localizedDescription)")
+                                #endif
+                            }
+                        }
+                    }
+                },
+                onDecline: {
+                    PushPermissionService.shared.markPromptDismissedThisSession()
+                }
+            )
+            .presentationDetents([.medium])
+            .presentationDragIndicator(.visible)
         }
         // Delete conversation confirmation alert (Story 2.6 - Task 4.2)
         .singleConversationDeleteAlert(isPresented: $viewModel.showDeleteConfirmation) {
@@ -252,8 +428,21 @@ struct ChatView: View {
                     .accessibilityLabel("Removing conversation")
             }
         }
+        // Story 11.3: Discovery paywall overlay — chat visible behind semi-transparent material
+        .overlay {
+            if showDiscoveryPaywall {
+                discoveryPaywallOverlay
+                    .transition(.opacity.combined(with: .move(edge: .bottom)))
+            }
+        }
+        .animation(.easeInOut(duration: 0.35), value: showDiscoveryPaywall)
         // Detect when AI response completes to trigger context prompt (Story 2.2) and extraction (Story 2.3)
         .onChange(of: viewModel.isStreaming) { wasStreaming, isStreaming in
+            // Story 10.5: Optimistic usage increment when a message is sent (streaming starts)
+            if !wasStreaming && isStreaming {
+                usageViewModel.onMessageSent()
+            }
+
             // When streaming ends (transitions from true to false)
             if wasStreaming && !isStreaming {
                 // Only trigger post-response flows when an assistant message was actually delivered.
@@ -274,6 +463,29 @@ struct ChatView: View {
                 if viewModel.currentResponseHasCrisisFlag {
                     viewModel.showCrisisResources = true
                 }
+
+                // Story 11.3/11.5: Show discovery paywall when discovery completes.
+                // Works in both discovery and non-discovery mode — handles the edge case
+                // where a user reaches chat through conversation list before completing discovery.
+                if viewModel.discoveryComplete {
+                    // H3 fix: Pass discovery context to coordinator for return paywall scenarios
+                    if viewModel.isDiscoveryMode {
+                        if let context = viewModel.discoveryPaywallContext {
+                            onboardingCoordinator.onDiscoveryComplete(with: context)
+                        } else {
+                            onboardingCoordinator.onDiscoveryComplete()
+                        }
+                    }
+                    // Hoist VM: create once when paywall is shown so state persists across renders
+                    discoveryPaywallVM = PersonalizedPaywallViewModel(
+                        presentation: .firstPresentation(
+                            discoveryContext: viewModel.discoveryPaywallContext ?? DiscoveryPaywallContext(
+                                coachingDomain: nil, ahaInsight: nil, keyTheme: nil, userName: nil
+                            )
+                        )
+                    )
+                    showDiscoveryPaywall = true
+                }
             }
         }
         .onChange(of: contextPromptViewModel.showPrompt) { _, isShowingPrompt in
@@ -284,6 +496,19 @@ struct ChatView: View {
         .onChange(of: shouldShowComposer) { _, isVisible in
             if !isVisible {
                 dismissKeyboard()
+            }
+        }
+        // Story 6.3 — Task 4.3: Bridge ViewModel paywall trigger to local sheet state
+        // Story 11.5: Route to personalized return paywall when in discovery mode
+        .onChange(of: viewModel.showPaywall) { _, shouldShow in
+            if shouldShow {
+                if viewModel.isDiscoveryMode && viewModel.discoveryPaywallDismissed {
+                    // Task 3.6: Show return paywall as sheet when dismissed user taps send
+                    showReturnPaywall = true
+                } else {
+                    showPaywall = true
+                }
+                viewModel.showPaywall = false
             }
         }
         .task(id: routeTaskId) {
@@ -327,6 +552,26 @@ struct ChatView: View {
             hasResolvedInitialRoute = true
         }
         .contentShape(Rectangle())
+        // Story 10.5: Refresh usage data on appear
+        .task {
+            await usageViewModel.refreshUsage()
+        }
+        // Story 10.5: Usage detail sheet
+        .sheet(isPresented: $showUsageDetail) {
+            UsageDetailSheet(viewModel: usageViewModel)
+                .presentationDetents([.medium])
+                .presentationDragIndicator(.visible)
+        }
+        // Story 8.3: Trigger push permission check when app goes to background
+        .onChange(of: scenePhase) { _, newPhase in
+            if newPhase == .inactive || newPhase == .background {
+                viewModel.onAppBackgrounded()
+            }
+        }
+        // Story 8.1: Record session engagement when user navigates away from chat
+        .onDisappear {
+            viewModel.onSessionEnd()
+        }
     }
 
     // MARK: - Auth Configuration
@@ -344,6 +589,9 @@ struct ChatView: View {
             insightSuggestionsViewModel.setAuthToken(token)
             await insightSuggestionsViewModel.configure(userId: userId)
         }
+
+        // Check trial/subscription status (Story 6.2)
+        await subscriptionViewModel.checkTrialStatus()
     }
 
     /// Full-screen overlay for the context prompt.
@@ -558,13 +806,13 @@ struct ChatView: View {
             }
             .onChange(of: viewModel.messages.last?.id) { _, _ in
                 // Handles cache->server replacement where count may not change.
-                scrollToBottomDeferred(
+                scrollToNewMessage(
                     proxy: proxy,
                     animated: !(isOpeningRoutedConversation || !hasResolvedInitialRoute)
                 )
             }
             .onChange(of: viewModel.messages.count) { _, _ in
-                scrollToBottomDeferred(
+                scrollToNewMessage(
                     proxy: proxy,
                     animated: !(isOpeningRoutedConversation || !hasResolvedInitialRoute)
                 )
@@ -578,10 +826,6 @@ struct ChatView: View {
                 if isStreaming {
                     scrollToBottomDeferred(proxy: proxy)
                 }
-            }
-            .onChange(of: viewModel.streamingContent) { _, _ in
-                // Auto-scroll as content streams in
-                scrollToBottomDeferred(proxy: proxy)
             }
             .onReceive(NotificationCenter.default.publisher(
                 for: UIResponder.keyboardWillChangeFrameNotification
@@ -694,10 +938,180 @@ struct ChatView: View {
         .accessibilityLabel("Personalization suggestion")
     }
 
+    // MARK: - Trial Expired Prompt (Story 6.2, Story 10.4: context-aware copy)
+
+    /// Gentle prompt shown instead of composer when trial has expired or messages are exhausted.
+    /// Story 10.4: Shows context-specific copy based on PaywallContext.
+    /// Users can still read past conversations but need to subscribe to send new messages.
+    private var trialExpiredPrompt: some View {
+        VStack(spacing: 12) {
+            Text(trialGatedCopy)
+                .font(.subheadline)
+                .foregroundStyle(Color.adaptiveText(colorScheme))
+                .multilineTextAlignment(.center)
+
+            Button {
+                showPaywall = true
+            } label: {
+                Text(trialGatedButtonLabel)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 44)
+                    .background(
+                        Capsule()
+                            .fill(Color.terracotta)
+                    )
+            }
+            .accessibilityLabel(trialGatedButtonLabel)
+            .accessibilityHint("Subscribe to continue sending messages")
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 16)
+    }
+
+    /// Story 10.4: Context-aware gated copy — warm, first-person per UX-11
+    private var trialGatedCopy: String {
+        switch subscriptionViewModel.currentPaywallContext {
+        case .messagesExhausted:
+            return "You've used all your conversations — subscribe to keep the momentum going."
+        case .cancelled:
+            return "Your coach is still here — ready to pick up where you left off"
+        case .trialExpired, .generic:
+            return "You've experienced what Coach App can do — keep the conversation going"
+        }
+    }
+
+    /// Story 10.4: Context-aware button label
+    private var trialGatedButtonLabel: String {
+        switch subscriptionViewModel.currentPaywallContext {
+        case .messagesExhausted:
+            return "See plans"
+        default:
+            return "View plans"
+        }
+    }
+
+    // MARK: - Discovery Gated Prompt (Story 11.5 — H1 fix)
+
+    /// Prompt shown when user dismissed the discovery paywall without subscribing.
+    /// Routes to the personalized return paywall (AC #6), NOT the generic PaywallView.
+    private var discoveryGatedPrompt: some View {
+        VStack(spacing: 12) {
+            Text("Your coach is still here — pick up where you left off")
+                .font(.subheadline)
+                .foregroundStyle(Color.adaptiveText(colorScheme))
+                .multilineTextAlignment(.center)
+
+            Button {
+                showReturnPaywall = true
+            } label: {
+                Text("Continue my coaching journey")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 44)
+                    .background(
+                        Capsule()
+                            .fill(Color.terracotta)
+                    )
+            }
+            .accessibilityLabel("Continue my coaching journey")
+            .accessibilityHint("Opens personalized subscription options")
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 16)
+    }
+
+    // MARK: - Rate Limited Prompt (Story 10.1)
+
+    /// Warm prompt shown instead of composer when user has reached their message limit.
+    /// Paid users see their reset date; trial users see a subscribe CTA.
+    private var rateLimitedPrompt: some View {
+        VStack(spacing: 12) {
+            Text(viewModel.error?.errorDescription ?? "You've reached your message limit for now.")
+                .font(.subheadline)
+                .foregroundStyle(Color.adaptiveText(colorScheme))
+                .multilineTextAlignment(.center)
+
+            if case .rateLimited(let isTrial, _) = viewModel.error, isTrial {
+                Button {
+                    showPaywall = true
+                } label: {
+                    Text("Subscribe")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 44)
+                        .background(
+                            Capsule()
+                                .fill(Color.terracotta)
+                        )
+                }
+                .accessibilityLabel("Subscribe")
+                .accessibilityHint("Subscribe to continue sending messages")
+            }
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 16)
+    }
+
+    // MARK: - Discovery Paywall Overlay (Story 11.5)
+
+    /// Semi-transparent overlay with personalized paywall. Chat remains visible underneath.
+    /// Uses PersonalizedPaywallView with .firstPresentation mode and discovery context.
+    private var discoveryPaywallOverlay: some View {
+        ZStack {
+            // Semi-transparent backdrop — coach's last message visible underneath (Task 3.3)
+            Rectangle()
+                .fill(.ultraThinMaterial)
+                .opacity(0.85)
+                .ignoresSafeArea()
+
+            PersonalizedPaywallView(
+                viewModel: discoveryPaywallVM ?? PersonalizedPaywallViewModel(
+                    presentation: .firstPresentation(
+                        discoveryContext: viewModel.discoveryPaywallContext ?? DiscoveryPaywallContext(
+                            coachingDomain: nil, ahaInsight: nil, keyTheme: nil, userName: nil
+                        )
+                    )
+                ),
+                subscriptionViewModel: subscriptionViewModel,
+                onPurchaseCompleted: { success in
+                    if success {
+                        // Task 3.4: Purchase success → dismiss overlay, send pending message
+                        showDiscoveryPaywall = false
+                        onboardingCoordinator.onSubscriptionConfirmed()
+                        onboardingCoordinator.completeOnboarding()
+                        if viewModel.pendingMessage != nil {
+                            Task {
+                                await viewModel.sendPendingMessage()
+                            }
+                        }
+                    }
+                },
+                onDismiss: {
+                    // Task 3.5: Dismiss → set discoveryPaywallDismissed, disable MessageInput
+                    showDiscoveryPaywall = false
+                    viewModel.discoveryPaywallDismissed = true
+                    onboardingCoordinator.onPaywallDismissed()
+                }
+            )
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Personalized coaching subscription offer")
+    }
+
     // MARK: - Actions
 
     /// Navigates back to inbox-style conversation list.
+    /// For discovery mode: marks onboarding complete so the user's conversation
+    /// is accessible on next launch (instead of restarting onboarding).
     private func navigateToInbox() {
+        if viewModel.isDiscoveryMode {
+            onboardingCoordinator.completeOnboarding()
+            onboardingCoordinator.flowState = .paidChat
+        }
         router.navigateToConversationList()
     }
 
@@ -726,7 +1140,9 @@ struct ChatView: View {
         !contextPromptViewModel.showSetupForm &&
         !insightSuggestionsViewModel.showSuggestions &&
         !showContextProfile &&
-        !showSettings
+        !showSettings &&
+        !showDiscoveryPaywall &&  // Story 11.3: Hide composer during discovery paywall
+        !showReturnPaywall  // Story 11.5: Hide composer during return paywall
     }
 
     private var shouldShowConversationLoadingState: Bool {
@@ -812,6 +1228,43 @@ struct ChatView: View {
         // Second pass catches layout that finishes one frame later on initial load.
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
             scrollToBottom(proxy: proxy, animated: animated)
+        }
+    }
+
+    /// Intelligently scrolls based on the last message:
+    /// - User messages: scroll to bottom to show typing indicator
+    /// - Assistant messages: scroll to top of message so user can read from the beginning
+    private func scrollToNewMessage(proxy: ScrollViewProxy, animated: Bool = true) {
+        guard let lastMessage = viewModel.messages.last else {
+            scrollToBottomDeferred(proxy: proxy, animated: animated)
+            return
+        }
+
+        if lastMessage.isFromUser {
+            // User message: scroll to bottom to show their message + typing indicator
+            scrollToBottomDeferred(proxy: proxy, animated: animated)
+        } else {
+            // Assistant message: scroll to the TOP of the message so user reads from the start
+            let messageId = lastMessage.id
+
+            let scrollAction = {
+                if animated {
+                    withAnimation(.easeOut(duration: 0.2)) {
+                        proxy.scrollTo(messageId, anchor: .top)
+                    }
+                } else {
+                    proxy.scrollTo(messageId, anchor: .top)
+                }
+            }
+
+            DispatchQueue.main.async {
+                scrollAction()
+            }
+
+            // Second pass catches layout that finishes one frame later
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                scrollAction()
+            }
         }
     }
 }

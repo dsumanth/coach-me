@@ -15,6 +15,9 @@ struct MessageInput: View {
     @FocusState private var isInputFocused: Bool
     @Environment(\.colorScheme) private var colorScheme
 
+    /// Network connectivity state (Story 7.2)
+    var networkMonitor: NetworkMonitor = .shared
+
     var body: some View {
         VStack(spacing: 8) {
             // Recording indicator - shows when actively recording
@@ -69,7 +72,7 @@ struct MessageInput: View {
                     if !hasText || voiceViewModel.isRecording {
                         VoiceInputButton(
                             isRecording: voiceViewModel.isRecording,
-                            isDisabled: viewModel.isLoading || viewModel.isStreaming,
+                            isDisabled: viewModel.isLoading || viewModel.isStreaming || !networkMonitor.isConnected,
                             onPress: {
                                 Task {
                                     await voiceViewModel.startRecording()
@@ -97,7 +100,10 @@ struct MessageInput: View {
                     }
                     .disabled(!canSend)
                     .accessibilityLabel("Send message")
-                    .accessibilityHint(canSend ? "Sends your message to the coach" : "Type a message first")
+                    .accessibilityHint(
+                        !networkMonitor.isConnected ? "You're offline. Sending requires a connection." :
+                        canSend ? "Sends your message to the coach" : "Type a message first"
+                    )
                     .transition(.scale.combined(with: .opacity))
                 }
             }
@@ -150,13 +156,17 @@ struct MessageInput: View {
     }
 
     /// Whether the send button should be enabled
+    /// Story 7.2: Also checks network connectivity — can't send when offline
+    /// Story 10.1: Also checks rate limit — can't send when rate limited
     private var canSend: Bool {
         let textToCheck = voiceViewModel.transcribedText.isEmpty
             ? viewModel.inputText
             : voiceViewModel.transcribedText
         return !textToCheck.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
                !viewModel.isLoading &&
-               !voiceViewModel.isRecording
+               !voiceViewModel.isRecording &&
+               !viewModel.isRateLimited &&
+               networkMonitor.isConnected
     }
 
     private var inputTextColor: Color {

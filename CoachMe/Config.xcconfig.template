@@ -17,3 +17,6 @@ COACH_ENVIRONMENT = development
 // Note: Use $() to escape // in URLs (xcconfig treats // as comments)
 SUPABASE_URL = https:/$()/YOUR_PROJECT.supabase.co
 SUPABASE_PUBLISHABLE_KEY = sb_publishable_YOUR_KEY_HERE
+
+// RevenueCat API Key (public Apple API key from RevenueCat Dashboard)
+REVENUECAT_API_KEY = your_revenuecat_public_api_key_here

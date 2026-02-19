@@ -131,6 +131,12 @@ struct ConversationRow: View {
 
         parts.append(preview)
 
+        let count = conversation.messageCount
+        parts.append(String.localizedStringWithFormat(
+            NSLocalizedString("message_count", comment: "Accessibility: number of messages"),
+            count
+        ))
+
         if !relativeTimestamp.isEmpty {
             parts.append(relativeTimestamp)
         }

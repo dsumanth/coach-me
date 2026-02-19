@@ -15,6 +15,8 @@ enum ChatError: LocalizedError, Equatable {
     case sessionExpired
     case streamError(String)
     case streamInterrupted
+    /// Story 10.1: User has exceeded their message limit for the billing period
+    case rateLimited(isTrial: Bool, resetDate: Date?)
 
     var errorDescription: String? {
         switch self {
@@ -28,6 +30,13 @@ enum ChatError: LocalizedError, Equatable {
             return message
         case .streamInterrupted:
             return "Our conversation was interrupted. Tap retry to continue."
+        case .rateLimited(let isTrial, let resetDate):
+            if isTrial {
+                return "You've used your trial sessions — ready to continue?"
+            } else {
+                let dateStr = resetDate.map { DateFormatter.localizedString(from: $0, dateStyle: .medium, timeStyle: .none) } ?? "soon"
+                return "We've had a lot of great conversations this month! Your next session refreshes on \(dateStr)."
+            }
         }
     }
 

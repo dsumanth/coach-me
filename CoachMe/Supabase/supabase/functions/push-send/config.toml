@@ -1,0 +1,3 @@
+[functions.push-send]
+# Gateway verify_jwt disabled so service-role/user auth can be handled in-function.
+verify_jwt = false

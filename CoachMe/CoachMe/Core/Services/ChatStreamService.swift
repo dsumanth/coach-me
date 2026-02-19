@@ -7,6 +7,7 @@
 //  Story 2.4: Updated to parse memory_moment flag from SSE events (AC #4)
 //  Story 3.4: Updated to parse pattern_insight flag from SSE events
 //  Story 4.1: Updated to parse crisis_detected flag from SSE events
+//  Story 8.5: Updated to parse reflection_offered and reflection_accepted flags
 //
 
 import Foundation
@@ -22,18 +23,36 @@ final class ChatStreamService {
     /// Story 2.4: Token event includes hasMemoryMoment flag for context injection
     /// Story 3.4: Token event includes hasPatternInsight flag for pattern recognition
     /// Story 4.1: Token event includes hasCrisisFlag for crisis detection
+    /// Story 8.5: Token event includes reflectionOffered flag; done event includes reflectionAccepted
     enum StreamEvent: Decodable, Equatable {
-        /// Token with content, memory moment indicator, pattern insight indicator, and crisis flag
+        /// Token with content, memory moment indicator, pattern insight indicator, crisis flag, and reflection flag
         /// Story 2.4: hasMemoryMoment indicates if accumulated content contains [MEMORY:...] tags
         /// Story 3.4: hasPatternInsight indicates if accumulated content contains [PATTERN:...] tags
         /// Story 4.1: hasCrisisFlag indicates if crisis indicators were detected in user message
-        case token(content: String, hasMemoryMoment: Bool, hasPatternInsight: Bool, hasCrisisFlag: Bool)
+        /// Story 8.5: reflectionOffered indicates if a coaching reflection was injected in this session
+        case token(content: String, hasMemoryMoment: Bool, hasPatternInsight: Bool, hasCrisisFlag: Bool, reflectionOffered: Bool)
 
-        /// Stream completed with message ID and usage stats
-        case done(messageId: UUID, usage: TokenUsage)
+        /// Stream completed with message ID, usage stats, reflection acceptance, discovery completion, and discovery profile
+        /// Story 8.5: reflectionAccepted indicates if user engaged with the offered reflection
+        /// Story 11.3: discoveryComplete indicates that the discovery conversation is finished
+        /// Story 11.5: discoveryProfile contains extracted context fields for personalized paywall
+        case done(messageId: UUID, usage: TokenUsage, reflectionAccepted: Bool, discoveryComplete: Bool, discoveryProfile: DiscoveryProfileData?)
 
         /// Error occurred during streaming
         case error(message: String)
+
+        /// Story 11.5: Discovery profile data from SSE response for paywall personalization
+        struct DiscoveryProfileData: Decodable, Equatable {
+            let coachingDomains: [String]?
+            let ahaInsight: String?
+            let keyThemes: [String]?
+
+            enum CodingKeys: String, CodingKey {
+                case coachingDomains = "coaching_domains"
+                case ahaInsight = "aha_insight"
+                case keyThemes = "key_themes"
+            }
+        }
 
         struct TokenUsage: Decodable, Equatable {
             let promptTokens: Int
@@ -53,6 +72,10 @@ final class ChatStreamService {
             case memoryMoment = "memory_moment"
             case patternInsight = "pattern_insight"
             case crisisDetected = "crisis_detected"  // Story 4.1
+            case reflectionOffered = "reflection_offered"  // Story 8.5
+            case reflectionAccepted = "reflection_accepted"  // Story 8.5
+            case discoveryComplete = "discovery_complete"  // Story 11.3
+            case discoveryProfile = "discovery_profile"  // Story 11.5
             case messageId = "message_id"
             case usage
             case message
@@ -71,11 +94,19 @@ final class ChatStreamService {
                 let patternInsight = try container.decodeIfPresent(Bool.self, forKey: .patternInsight) ?? false
                 // Story 4.1: Parse crisis_detected flag (defaults to false for backward compatibility)
                 let crisisDetected = try container.decodeIfPresent(Bool.self, forKey: .crisisDetected) ?? false
-                self = .token(content: content, hasMemoryMoment: memoryMoment, hasPatternInsight: patternInsight, hasCrisisFlag: crisisDetected)
+                // Story 8.5: Parse reflection_offered flag (defaults to false for backward compatibility)
+                let reflectionOffered = try container.decodeIfPresent(Bool.self, forKey: .reflectionOffered) ?? false
+                self = .token(content: content, hasMemoryMoment: memoryMoment, hasPatternInsight: patternInsight, hasCrisisFlag: crisisDetected, reflectionOffered: reflectionOffered)
             case "done":
                 let messageId = try container.decode(UUID.self, forKey: .messageId)
                 let usage = try container.decode(TokenUsage.self, forKey: .usage)
-                self = .done(messageId: messageId, usage: usage)
+                // Story 8.5: Parse reflection_accepted flag (defaults to false for backward compatibility)
+                let reflectionAccepted = try container.decodeIfPresent(Bool.self, forKey: .reflectionAccepted) ?? false
+                // Story 11.3: Parse discovery_complete flag (defaults to false for backward compatibility)
+                let discoveryComplete = try container.decodeIfPresent(Bool.self, forKey: .discoveryComplete) ?? false
+                // Story 11.5: Parse discovery_profile (nil if not present or malformed)
+                let discoveryProfile = try container.decodeIfPresent(DiscoveryProfileData.self, forKey: .discoveryProfile)
+                self = .done(messageId: messageId, usage: usage, reflectionAccepted: reflectionAccepted, discoveryComplete: discoveryComplete, discoveryProfile: discoveryProfile)
             case "error":
                 let message = try container.decode(String.self, forKey: .message)
                 self = .error(message: message)
@@ -93,10 +124,13 @@ final class ChatStreamService {
     struct ChatRequest: Encodable {
         let message: String
         let conversationId: UUID
+        /// Story 11.3: When true, the coach speaks first (discovery mode opening message)
+        let firstMessage: Bool
 
         enum CodingKeys: String, CodingKey {
             case message
             case conversationId = "conversation_id"
+            case firstMessage = "first_message"
         }
     }
 
@@ -152,10 +186,12 @@ final class ChatStreamService {
     /// - Parameters:
     ///   - message: User message to send
     ///   - conversationId: Current conversation ID
+    ///   - firstMessage: When true, coach speaks first (Story 11.3 discovery mode)
     /// - Returns: AsyncThrowingStream of StreamEvents
     func streamChat(
         message: String,
-        conversationId: UUID
+        conversationId: UUID,
+        firstMessage: Bool = false
     ) -> AsyncThrowingStream<StreamEvent, Error> {
         AsyncThrowingStream { continuation in
             // Track the inner task for cancellation propagation
@@ -168,6 +204,7 @@ final class ChatStreamService {
                         didReceiveStreamData = try await streamOnce(
                             message: message,
                             conversationId: conversationId,
+                            firstMessage: firstMessage,
                             continuation: continuation
                         )
                         continuation.finish()
@@ -208,6 +245,7 @@ final class ChatStreamService {
     private func streamOnce(
         message: String,
         conversationId: UUID,
+        firstMessage: Bool,
         continuation: AsyncThrowingStream<StreamEvent, Error>.Continuation
     ) async throws -> Bool {
         try Task.checkCancellation()
@@ -230,7 +268,7 @@ final class ChatStreamService {
             #endif
         }
 
-        let body = ChatRequest(message: message, conversationId: conversationId)
+        let body = ChatRequest(message: message, conversationId: conversationId, firstMessage: firstMessage)
         request.httpBody = try JSONEncoder().encode(body)
 
         #if DEBUG
@@ -248,15 +286,36 @@ final class ChatStreamService {
         #endif
 
         guard httpResponse.statusCode == 200 else {
-            #if DEBUG
-            // Try to read error body for more details
+            // Read error body for details (needed for 429 parsing and debug logging)
             var errorBody = ""
             for try await line in bytes.lines {
                 errorBody += line
                 if errorBody.count > 500 { break }
             }
+
+            #if DEBUG
             print("ChatStreamService: Error response: \(errorBody)")
             #endif
+
+            // Story 10.1: Parse 429 rate limit response for rich error details (AC #5)
+            if httpResponse.statusCode == 429, let data = errorBody.data(using: .utf8) {
+                if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                    let isTrial = json["is_trial"] as? Bool ?? false
+                    var resetDate: Date?
+                    if let resetStr = json["remaining_until_reset"] as? String {
+                        let formatter = ISO8601DateFormatter()
+                        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+                        resetDate = formatter.date(from: resetStr)
+                        // Fallback without fractional seconds
+                        if resetDate == nil {
+                            formatter.formatOptions = [.withInternetDateTime]
+                            resetDate = formatter.date(from: resetStr)
+                        }
+                    }
+                    throw ChatStreamError.rateLimited(isTrial: isTrial, resetDate: resetDate)
+                }
+            }
+
             throw ChatStreamError.httpError(statusCode: httpResponse.statusCode)
         }
 
@@ -331,6 +390,8 @@ enum ChatStreamError: LocalizedError, Equatable {
     case httpError(statusCode: Int)
     case streamInterrupted
     case authenticationRequired
+    /// Story 10.1: Rate limited — user has exceeded message quota for their billing period
+    case rateLimited(isTrial: Bool, resetDate: Date?)
 
     var errorDescription: String? {
         switch self {
@@ -345,6 +406,24 @@ enum ChatStreamError: LocalizedError, Equatable {
             return "Our connection was interrupted. Let's try again."
         case .authenticationRequired:
             return "Please sign in to continue our conversation."
+        case .rateLimited(let isTrial, let resetDate):
+            if isTrial {
+                return "You've used your trial sessions — ready to continue?"
+            } else {
+                let dateStr = resetDate.map { DateFormatter.localizedString(from: $0, dateStyle: .medium, timeStyle: .none) } ?? "soon"
+                return "We've had a lot of great conversations this month! Your next session refreshes on \(dateStr)."
+            }
+        }
+    }
+
+    static func == (lhs: ChatStreamError, rhs: ChatStreamError) -> Bool {
+        switch (lhs, rhs) {
+        case (.invalidResponse, .invalidResponse): return true
+        case (.httpError(let a), .httpError(let b)): return a == b
+        case (.streamInterrupted, .streamInterrupted): return true
+        case (.authenticationRequired, .authenticationRequired): return true
+        case (.rateLimited(let a1, let a2), .rateLimited(let b1, let b2)): return a1 == b1 && a2 == b2
+        default: return false
         }
     }
 }

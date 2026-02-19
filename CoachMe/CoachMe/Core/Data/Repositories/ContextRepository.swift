@@ -19,6 +19,8 @@ enum ContextError: LocalizedError, Equatable {
     case saveFailed(String)
     case cacheError(String)
     case encodingError(String)
+    case insightDismissFailed(String)
+    case styleOverrideFailed(String)
 
     var errorDescription: String? {
         switch self {
@@ -34,6 +36,10 @@ enum ContextError: LocalizedError, Equatable {
             return "I had trouble with local storage. \(reason)"
         case .encodingError(let reason):
             return "I had trouble processing your data. \(reason)"
+        case .insightDismissFailed(let reason):
+            return "I couldn't remove that insight. \(reason)"
+        case .styleOverrideFailed(let reason):
+            return "I couldn't save your style preference. \(reason)"
         }
     }
 
@@ -49,6 +55,10 @@ enum ContextError: LocalizedError, Equatable {
         case (.cacheError(let a), .cacheError(let b)):
             return a == b
         case (.encodingError(let a), .encodingError(let b)):
+            return a == b
+        case (.insightDismissFailed(let a), .insightDismissFailed(let b)):
+            return a == b
+        case (.styleOverrideFailed(let a), .styleOverrideFailed(let b)):
             return a == b
         default:
             return false
@@ -74,6 +84,9 @@ protocol ContextRepositoryProtocol {
     func getPendingInsights(userId: UUID) async throws -> [ExtractedInsight]
     func confirmInsight(userId: UUID, insightId: UUID) async throws
     func dismissInsight(userId: UUID, insightId: UUID) async throws
+
+    // Story 11.4: Discovery-to-Profile Pipeline
+    func saveDiscoveryProfile(userId: UUID, discoveryData: DiscoveryProfileData) async throws
 }
 
 /// Repository for context profile operations
@@ -208,9 +221,30 @@ final class ContextRepository: ContextRepositoryProtocol {
 
     /// Updates an existing context profile
     /// Syncs to remote and updates local cache
+    /// Story 7.3: Queues update for offline sync if not connected
     /// - Parameter profile: The profile to update
     /// - Throws: ContextError if update fails
     func updateProfile(_ profile: ContextProfile) async throws {
+        // Story 7.3/7.4: If offline, update local cache optimistically and queue for sync
+        // Story 7.4: Set localUpdatedAt so conflict resolver knows local was edited offline
+        if !NetworkMonitor.shared.isConnected {
+            try await cacheProfile(profile)
+            // Mark the cached profile with localUpdatedAt for conflict resolution
+            let descriptor = FetchDescriptor<CachedContextProfile>()
+            let cached = try modelContext.fetch(descriptor)
+            if let localCache = cached.first(where: { $0.userId == profile.userId }) {
+                localCache.localUpdatedAt = Date()
+                localCache.syncStatus = "pending"
+                try modelContext.save()
+            }
+            OfflineSyncService.shared.queueOperation(.updateContextProfile(profile))
+            #if DEBUG
+            print("ContextRepository: Profile update queued for offline sync (localUpdatedAt set)")
+            #endif
+            return
+        }
+
+        // Online: existing remote-first logic
         var updated = profile
         updated.updatedAt = Date()
 
@@ -556,6 +590,14 @@ final class ContextRepository: ContextRepositoryProtocol {
             // Update local cache
             try await cacheProfile(profile)
 
+            // Story 8.1: Record insight confirmation as learning signal (non-blocking)
+            let category = insight.category.rawValue
+            Task {
+                try? await LearningSignalService.shared.recordInsightFeedback(
+                    insightId: insightId, action: .confirmed, category: category
+                )
+            }
+
             #if DEBUG
             print("ContextRepository: Confirmed insight \(insightId) as \(insight.category.rawValue)")
             #endif
@@ -575,6 +617,9 @@ final class ContextRepository: ContextRepositoryProtocol {
         do {
             var profile = try await fetchProfile(userId: userId)
 
+            // Story 8.1: Capture category before removal for learning signal
+            let insightCategory = profile.extractedInsights.first { $0.id == insightId }?.category.rawValue
+
             // Remove the insight
             profile.extractedInsights.removeAll { $0.id == insightId }
             profile.updatedAt = Date()
@@ -589,6 +634,15 @@ final class ContextRepository: ContextRepositoryProtocol {
             // Update local cache
             try await cacheProfile(profile)
 
+            // Story 8.1: Record insight dismissal as learning signal (non-blocking)
+            if let category = insightCategory {
+                Task {
+                    try? await LearningSignalService.shared.recordInsightFeedback(
+                        insightId: insightId, action: .dismissed, category: category
+                    )
+                }
+            }
+
             #if DEBUG
             print("ContextRepository: Dismissed insight \(insightId)")
             #endif
@@ -597,6 +651,78 @@ final class ContextRepository: ContextRepositoryProtocol {
         } catch {
             throw ContextError.saveFailed(error.localizedDescription)
         }
+    }
+
+    // MARK: - Story 11.4: Discovery Profile Pipeline
+
+    /// Saves discovery session data into the user's existing context profile
+    /// Fetches the current profile, merges discovery fields, then updates remote and local cache
+    /// If offline, queues the update for sync on reconnect (Story 7.3)
+    /// - Parameters:
+    ///   - userId: The user's ID
+    ///   - discoveryData: Extracted discovery session fields
+    /// - Throws: ContextError if save fails
+    func saveDiscoveryProfile(userId: UUID, discoveryData: DiscoveryProfileData) async throws {
+        do {
+            var profile = try await fetchProfile(userId: userId)
+
+            // Merge discovery fields into existing profile
+            profile.discoveryCompletedAt = Date()
+            profile.ahaInsight = discoveryData.ahaInsight
+            profile.coachingDomains = discoveryData.coachingDomains
+            profile.currentChallenges = discoveryData.currentChallenges
+            profile.emotionalBaseline = discoveryData.emotionalBaseline
+            profile.communicationStyle = discoveryData.communicationStyle
+            profile.keyThemes = discoveryData.keyThemes
+            profile.strengthsIdentified = discoveryData.strengthsIdentified
+            profile.vision = discoveryData.vision
+            profile.contextVersion += 1
+            profile.updatedAt = Date()
+
+            // Story 7.3: If offline, cache locally and queue for sync
+            if !NetworkMonitor.shared.isConnected {
+                try await cacheProfile(profile)
+                let descriptor = FetchDescriptor<CachedContextProfile>()
+                let cached = try modelContext.fetch(descriptor)
+                if let localCache = cached.first(where: { $0.userId == profile.userId }) {
+                    localCache.localUpdatedAt = Date()
+                    localCache.syncStatus = "pending"
+                    try modelContext.save()
+                }
+                OfflineSyncService.shared.queueOperation(.updateContextProfile(profile))
+                #if DEBUG
+                print("ContextRepository: Discovery profile queued for offline sync")
+                #endif
+                return
+            }
+
+            // Online: update remote then cache
+            try await supabase
+                .from("context_profiles")
+                .update(profile)
+                .eq("user_id", value: userId.uuidString)
+                .execute()
+
+            try await cacheProfile(profile)
+
+            #if DEBUG
+            print("ContextRepository: Saved discovery profile for user \(userId)")
+            #endif
+        } catch let error as ContextError {
+            throw error
+        } catch {
+            #if DEBUG
+            print("ContextRepository: Failed to save discovery profile: \(error)")
+            #endif
+            throw ContextError.saveFailed(error.localizedDescription)
+        }
+    }
+
+    // MARK: - Public Cache Methods (Story 7.4)
+
+    /// Update local SwiftData cache with a profile (used by OfflineSyncService during conflict resolution)
+    func updateLocalCache(_ profile: ContextProfile) async throws {
+        try await cacheProfile(profile)
     }
 
     // MARK: - Private Cache Methods

@@ -92,19 +92,6 @@ final class ContextPromptAccessibilityTests: XCTestCase {
         XCTAssertNotNil(form.onSkip, "onSkip callback should be set")
     }
 
-    // MARK: - Integration with ChatView
-
-    func testContextPromptViewModelWithMockRepository() {
-        // Given/When: Creating a ContextPromptViewModel with mock
-        let mockRepository = MockContextRepository()
-        let viewModel = ContextPromptViewModel(contextRepository: mockRepository)
-
-        // Then: Should be valid
-        XCTAssertNotNil(viewModel, "ContextPromptViewModel should be instantiable")
-        XCTAssertFalse(viewModel.showPrompt, "showPrompt should default to false")
-        XCTAssertFalse(viewModel.showSetupForm, "showSetupForm should default to false")
-        XCTAssertFalse(viewModel.isSaving, "isSaving should default to false")
-    }
 }
 
 // MARK: - Test Extensions for View Accessibility Verification

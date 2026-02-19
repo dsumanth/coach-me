@@ -513,4 +513,254 @@ final class ContextProfileTests: XCTestCase {
         XCTAssertNotEqual(ContextError.saveFailed("a"), ContextError.saveFailed("b"))
         XCTAssertNotEqual(ContextError.notFound, ContextError.notAuthenticated)
     }
+
+    // MARK: - Story 11.4: Discovery Profile Field Tests
+
+    func testDiscoveryFieldsDecodingWithAllFields() throws {
+        let json = """
+        {
+            "id": "11111111-1111-1111-1111-111111111111",
+            "user_id": "22222222-2222-2222-2222-222222222222",
+            "values": [],
+            "goals": [],
+            "situation": {},
+            "extracted_insights": [],
+            "context_version": 1,
+            "first_session_complete": false,
+            "prompt_dismissed_count": 0,
+            "discovery_completed_at": "2026-02-10T14:00:00Z",
+            "aha_insight": "control pattern spans career and relationships",
+            "coaching_domains": ["career", "relationships"],
+            "current_challenges": ["work-life balance", "delegation"],
+            "emotional_baseline": "cautiously optimistic",
+            "communication_style": "reflective",
+            "key_themes": ["control", "growth"],
+            "strengths_identified": ["self-awareness", "resilience"],
+            "vision": "leading with confidence",
+            "created_at": "2026-02-06T10:00:00Z",
+            "updated_at": "2026-02-10T14:00:00Z"
+        }
+        """.data(using: .utf8)!
+
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let profile = try decoder.decode(ContextProfile.self, from: json)
+
+        XCTAssertNotNil(profile.discoveryCompletedAt)
+        XCTAssertEqual(profile.ahaInsight, "control pattern spans career and relationships")
+        XCTAssertEqual(profile.coachingDomains, ["career", "relationships"])
+        XCTAssertEqual(profile.currentChallenges, ["work-life balance", "delegation"])
+        XCTAssertEqual(profile.emotionalBaseline, "cautiously optimistic")
+        XCTAssertEqual(profile.communicationStyle, "reflective")
+        XCTAssertEqual(profile.keyThemes, ["control", "growth"])
+        XCTAssertEqual(profile.strengthsIdentified, ["self-awareness", "resilience"])
+        XCTAssertEqual(profile.vision, "leading with confidence")
+        XCTAssertTrue(profile.hasDiscoveryData)
+    }
+
+    func testDiscoveryFieldsDecodingBackwardCompatibility() throws {
+        // JSON without any discovery fields — simulates existing profiles before migration
+        let json = """
+        {
+            "id": "11111111-1111-1111-1111-111111111111",
+            "user_id": "22222222-2222-2222-2222-222222222222",
+            "values": [],
+            "goals": [],
+            "situation": {},
+            "extracted_insights": [],
+            "context_version": 2,
+            "first_session_complete": true,
+            "prompt_dismissed_count": 1,
+            "created_at": "2026-02-06T10:00:00Z",
+            "updated_at": "2026-02-06T12:00:00Z"
+        }
+        """.data(using: .utf8)!
+
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let profile = try decoder.decode(ContextProfile.self, from: json)
+
+        // All discovery fields should be nil/empty
+        XCTAssertNil(profile.discoveryCompletedAt)
+        XCTAssertNil(profile.ahaInsight)
+        XCTAssertTrue(profile.coachingDomains.isEmpty)
+        XCTAssertTrue(profile.currentChallenges.isEmpty)
+        XCTAssertNil(profile.emotionalBaseline)
+        XCTAssertNil(profile.communicationStyle)
+        XCTAssertTrue(profile.keyThemes.isEmpty)
+        XCTAssertTrue(profile.strengthsIdentified.isEmpty)
+        XCTAssertNil(profile.vision)
+        XCTAssertFalse(profile.hasDiscoveryData)
+    }
+
+    func testDiscoveryFieldsDecodingPartialFields() throws {
+        // JSON with only some discovery fields — simulates partial extraction
+        let json = """
+        {
+            "id": "11111111-1111-1111-1111-111111111111",
+            "user_id": "22222222-2222-2222-2222-222222222222",
+            "values": [],
+            "goals": [],
+            "situation": {},
+            "extracted_insights": [],
+            "context_version": 1,
+            "first_session_complete": false,
+            "prompt_dismissed_count": 0,
+            "discovery_completed_at": "2026-02-10T14:00:00Z",
+            "aha_insight": "core insight",
+            "coaching_domains": ["mindset"],
+            "created_at": "2026-02-06T10:00:00Z",
+            "updated_at": "2026-02-10T14:00:00Z"
+        }
+        """.data(using: .utf8)!
+
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let profile = try decoder.decode(ContextProfile.self, from: json)
+
+        XCTAssertNotNil(profile.discoveryCompletedAt)
+        XCTAssertEqual(profile.ahaInsight, "core insight")
+        XCTAssertEqual(profile.coachingDomains, ["mindset"])
+        // Missing arrays default to empty
+        XCTAssertTrue(profile.currentChallenges.isEmpty)
+        XCTAssertTrue(profile.keyThemes.isEmpty)
+        XCTAssertTrue(profile.strengthsIdentified.isEmpty)
+        // Missing optionals remain nil
+        XCTAssertNil(profile.emotionalBaseline)
+        XCTAssertNil(profile.communicationStyle)
+        XCTAssertNil(profile.vision)
+        XCTAssertTrue(profile.hasDiscoveryData)
+    }
+
+    func testDiscoveryFieldsEncoding() throws {
+        let userId = UUID()
+        var profile = ContextProfile.empty(userId: userId)
+        profile.discoveryCompletedAt = Date()
+        profile.ahaInsight = "test insight"
+        profile.coachingDomains = ["career"]
+        profile.communicationStyle = "direct"
+        profile.vision = "test vision"
+
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        let data = try encoder.encode(profile)
+        let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+
+        // Verify snake_case keys
+        XCTAssertNotNil(json?["discovery_completed_at"], "Should encode discoveryCompletedAt as discovery_completed_at")
+        XCTAssertNotNil(json?["aha_insight"], "Should encode ahaInsight as aha_insight")
+        XCTAssertNotNil(json?["coaching_domains"], "Should encode coachingDomains as coaching_domains")
+        XCTAssertNotNil(json?["communication_style"], "Should encode communicationStyle as communication_style")
+        XCTAssertNotNil(json?["current_challenges"], "Should encode currentChallenges as current_challenges")
+        XCTAssertNotNil(json?["emotional_baseline"], "Should encode emotionalBaseline as emotional_baseline")
+        XCTAssertNotNil(json?["key_themes"], "Should encode keyThemes as key_themes")
+        XCTAssertNotNil(json?["strengths_identified"], "Should encode strengthsIdentified as strengths_identified")
+
+        // Verify camelCase keys are NOT used
+        XCTAssertNil(json?["discoveryCompletedAt"], "Should NOT use camelCase discoveryCompletedAt")
+        XCTAssertNil(json?["ahaInsight"], "Should NOT use camelCase ahaInsight")
+        XCTAssertNil(json?["coachingDomains"], "Should NOT use camelCase coachingDomains")
+    }
+
+    func testDiscoveryFieldsRoundTrip() throws {
+        let userId = UUID()
+        var original = ContextProfile.empty(userId: userId)
+        original.discoveryCompletedAt = Date()
+        original.ahaInsight = "round trip insight"
+        original.coachingDomains = ["career", "relationships"]
+        original.currentChallenges = ["delegation"]
+        original.emotionalBaseline = "hopeful"
+        original.communicationStyle = "reflective"
+        original.keyThemes = ["control", "growth"]
+        original.strengthsIdentified = ["self-awareness"]
+        original.vision = "confident leader"
+
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        let data = try encoder.encode(original)
+
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let decoded = try decoder.decode(ContextProfile.self, from: data)
+
+        XCTAssertEqual(original.ahaInsight, decoded.ahaInsight)
+        XCTAssertEqual(original.coachingDomains, decoded.coachingDomains)
+        XCTAssertEqual(original.currentChallenges, decoded.currentChallenges)
+        XCTAssertEqual(original.emotionalBaseline, decoded.emotionalBaseline)
+        XCTAssertEqual(original.communicationStyle, decoded.communicationStyle)
+        XCTAssertEqual(original.keyThemes, decoded.keyThemes)
+        XCTAssertEqual(original.strengthsIdentified, decoded.strengthsIdentified)
+        XCTAssertEqual(original.vision, decoded.vision)
+        XCTAssertTrue(decoded.hasDiscoveryData)
+    }
+
+    func testEmptyProfileHasNoDiscoveryData() {
+        let userId = UUID()
+        let profile = ContextProfile.empty(userId: userId)
+
+        XCTAssertFalse(profile.hasDiscoveryData, "Empty profile should have no discovery data")
+        XCTAssertNil(profile.discoveryCompletedAt)
+        XCTAssertNil(profile.ahaInsight)
+        XCTAssertTrue(profile.coachingDomains.isEmpty)
+        XCTAssertTrue(profile.currentChallenges.isEmpty)
+        XCTAssertNil(profile.emotionalBaseline)
+        XCTAssertNil(profile.communicationStyle)
+        XCTAssertTrue(profile.keyThemes.isEmpty)
+        XCTAssertTrue(profile.strengthsIdentified.isEmpty)
+        XCTAssertNil(profile.vision)
+    }
+
+    func testHasDiscoveryDataRequiresSubstantiveFields() {
+        let userId = UUID()
+        var profile = ContextProfile.empty(userId: userId)
+        // Set timestamp but leave all fields empty
+        profile.discoveryCompletedAt = Date()
+        XCTAssertFalse(profile.hasDiscoveryData, "Timestamp alone should not count as discovery data")
+
+        // Add one substantive field
+        profile.ahaInsight = "key insight"
+        XCTAssertTrue(profile.hasDiscoveryData, "Timestamp + aha insight should count as discovery data")
+    }
+
+    // MARK: - Story 11.4: DiscoveryProfileData DTO Tests
+
+    func testDiscoveryProfileDataCreation() {
+        let data = DiscoveryProfileData(
+            ahaInsight: "key insight",
+            coachingDomains: ["career", "relationships"],
+            currentChallenges: ["delegation"],
+            emotionalBaseline: "hopeful",
+            communicationStyle: "direct",
+            keyThemes: ["control"],
+            strengthsIdentified: ["resilience"],
+            vision: "confident leader"
+        )
+
+        XCTAssertEqual(data.ahaInsight, "key insight")
+        XCTAssertEqual(data.coachingDomains, ["career", "relationships"])
+        XCTAssertEqual(data.currentChallenges, ["delegation"])
+        XCTAssertEqual(data.emotionalBaseline, "hopeful")
+        XCTAssertEqual(data.communicationStyle, "direct")
+        XCTAssertEqual(data.keyThemes, ["control"])
+        XCTAssertEqual(data.strengthsIdentified, ["resilience"])
+        XCTAssertEqual(data.vision, "confident leader")
+    }
+
+    func testDiscoveryProfileDataWithNilFields() {
+        let data = DiscoveryProfileData(
+            ahaInsight: nil,
+            coachingDomains: [],
+            currentChallenges: [],
+            emotionalBaseline: nil,
+            communicationStyle: nil,
+            keyThemes: [],
+            strengthsIdentified: [],
+            vision: nil
+        )
+
+        XCTAssertNil(data.ahaInsight)
+        XCTAssertTrue(data.coachingDomains.isEmpty)
+        XCTAssertNil(data.communicationStyle)
+        XCTAssertNil(data.vision)
+    }
 }

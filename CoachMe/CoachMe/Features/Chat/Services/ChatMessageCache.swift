@@ -11,6 +11,7 @@ enum ChatMessageCache {
     private static let cacheDirectoryName = "chat-message-cache-v1"
 
     static func load(conversationId: UUID) -> [ChatMessage]? {
+        migrateLegacyCacheIfNeeded()
         let url = fileURL(for: conversationId)
         guard let data = try? Data(contentsOf: url) else { return nil }
 
@@ -20,6 +21,7 @@ enum ChatMessageCache {
     }
 
     static func save(messages: [ChatMessage], conversationId: UUID) {
+        migrateLegacyCacheIfNeeded()
         let url = fileURL(for: conversationId)
         ensureCacheDirectoryExists()
 
@@ -36,6 +38,7 @@ enum ChatMessageCache {
 
     static func clearAll() {
         try? FileManager.default.removeItem(at: cacheDirectoryURL())
+        try? FileManager.default.removeItem(at: legacyCacheDirectoryURL())
     }
 
     private static func fileURL(for conversationId: UUID) -> URL {
@@ -43,6 +46,12 @@ enum ChatMessageCache {
     }
 
     private static func cacheDirectoryURL() -> URL {
+        let root = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+            ?? URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
+        return root.appendingPathComponent(cacheDirectoryName, isDirectory: true)
+    }
+
+    private static func legacyCacheDirectoryURL() -> URL {
         let root = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first
             ?? URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
         return root.appendingPathComponent(cacheDirectoryName, isDirectory: true)
@@ -54,5 +63,25 @@ enum ChatMessageCache {
             withIntermediateDirectories: true
         )
     }
-}
 
+    /// One-time migration from cache directory to app support directory
+    /// so chat history survives routine cache eviction.
+    private static func migrateLegacyCacheIfNeeded() {
+        let fileManager = FileManager.default
+        let newURL = cacheDirectoryURL()
+        let oldURL = legacyCacheDirectoryURL()
+
+        guard fileManager.fileExists(atPath: oldURL.path) else { return }
+        ensureCacheDirectoryExists()
+
+        guard let oldFiles = try? fileManager.contentsOfDirectory(at: oldURL, includingPropertiesForKeys: nil) else {
+            return
+        }
+
+        for oldFile in oldFiles where oldFile.pathExtension == "json" {
+            let newFile = newURL.appendingPathComponent(oldFile.lastPathComponent)
+            if fileManager.fileExists(atPath: newFile.path) { continue }
+            try? fileManager.copyItem(at: oldFile, to: newFile)
+        }
+    }
+}

@@ -4,7 +4,7 @@
  * Story 3.5: Cross-Domain Pattern Synthesis
  *
  * Detects patterns that span multiple coaching domains for the same user.
- * Uses Claude Haiku for cost-efficient background analysis.
+ * Uses a low-cost background model for cost-efficient analysis.
  * Results are cached in pattern_syntheses table (24h TTL).
  *
  * Key design: NOT on the critical chat path — can run async.
@@ -13,6 +13,7 @@
 
 import { SupabaseClient } from 'npm:@supabase/supabase-js@2.94.1';
 import { streamChatCompletion, type ChatMessage } from './llm-client.ts';
+import { selectBackgroundModel, enforceInputTokenBudget } from './model-routing.ts';
 
 // MARK: - Types
 
@@ -80,9 +81,6 @@ export const MAX_SYNTHESES_PER_SESSION = 1;
 
 /** Minimum sessions between same-theme synthesis (AC #4) */
 export const MIN_SESSIONS_BETWEEN_SYNTHESIS = 3;
-
-/** Model for cost-efficient background analysis (Task 2.4) */
-const ANALYSIS_MODEL = 'claude-haiku-4-5-20251001';
 
 // MARK: - Synthesis System Prompt (Task 2.1-2.3)
 
@@ -323,7 +321,7 @@ async function getConversationsByDomain(
 
 /**
  * Call LLM to analyze cross-domain conversation patterns.
- * Uses Claude Haiku for cost efficiency (Task 2.4).
+ * Uses background model routing policy for cost efficiency.
  */
 async function analyzePatterns(
   domainGroups: DomainConversationGroup[],
@@ -343,13 +341,16 @@ async function analyzePatterns(
       content: `Analyze the following conversations across ${domainGroups.length} coaching domains for cross-domain patterns:\n\n${userMessage}`,
     },
   ];
+  const route = selectBackgroundModel('pattern_synthesis');
+  const budgetedMessages = enforceInputTokenBudget(messages, route.inputBudgetTokens);
 
-  // Collect full response from streaming API (Task 2.4: use Haiku)
+  // Collect full response from streaming API
   let fullResponse = '';
-  for await (const chunk of streamChatCompletion(messages, {
-    model: ANALYSIS_MODEL,
-    maxTokens: 2048,
-    temperature: 0.3, // Lower temperature for more consistent analysis
+  for await (const chunk of streamChatCompletion(budgetedMessages, {
+    provider: route.provider,
+    model: route.model,
+    maxTokens: route.maxOutputTokens,
+    temperature: route.temperature,
   })) {
     if (chunk.type === 'token' && chunk.content) {
       fullResponse += chunk.content;

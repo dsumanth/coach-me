@@ -19,7 +19,9 @@ struct SettingsViewModelTests {
         let viewModel = SettingsViewModel()
 
         #expect(!viewModel.showDeleteAllConfirmation)
+        #expect(!viewModel.showDeleteAccountConfirmation)
         #expect(!viewModel.isDeleting)
+        #expect(!viewModel.isDeletingAccount)
         #expect(viewModel.error == nil)
         #expect(!viewModel.showError)
     }
@@ -142,5 +144,115 @@ struct SettingsViewModelMockTests {
         // Then: Returns false and shows appropriate error
         #expect(success == false)
         #expect(viewModel.showError)
+    }
+}
+
+// MARK: - Account Deletion Tests (Story 6.6)
+
+@MainActor
+struct AccountDeletionViewModelTests {
+
+    // MARK: - Task 5.1: Success path
+
+    @Test("deleteAccount has correct initial state")
+    func testDeleteAccountInitialState() async {
+        // Given: ViewModel in initial state
+        // Note: Full deleteAccount success path requires a mock AuthService.
+        // Integration testing validates the full flow.
+        let viewModel = SettingsViewModel()
+
+        // Verify initial state
+        #expect(!viewModel.isDeletingAccount)
+        #expect(!viewModel.showDeleteAccountConfirmation)
+    }
+
+    @Test("isDeletingAccount resets after deleteAccount completes")
+    func testDeleteAccountResetsLoadingState() async {
+        let viewModel = SettingsViewModel()
+
+        // Call deleteAccount — will fail without auth session but state should reset
+        _ = await viewModel.deleteAccount()
+
+        // isDeletingAccount must be reset regardless of outcome
+        #expect(!viewModel.isDeletingAccount)
+    }
+
+    // MARK: - Task 5.2: Failure path
+
+    @Test("deleteAccount sets error state on failure")
+    func testDeleteAccountFailure() async {
+        // Given: ViewModel without auth session (will fail)
+        let viewModel = SettingsViewModel()
+
+        // When: Attempting account deletion without session
+        let success = await viewModel.deleteAccount()
+
+        // Then: Returns false and sets error
+        #expect(success == false)
+        #expect(viewModel.error == .accountDeletionFailed)
+        #expect(viewModel.showError)
+
+        // Error message uses warm first-person language (UX-11)
+        let message = viewModel.error?.errorDescription ?? ""
+        #expect(message.contains("I couldn't"))
+        #expect(message.contains("account"))
+    }
+
+    @Test("showDeleteAccountConfirmation can be toggled")
+    func testShowDeleteAccountConfirmationToggle() {
+        let viewModel = SettingsViewModel()
+
+        #expect(!viewModel.showDeleteAccountConfirmation)
+
+        viewModel.showDeleteAccountConfirmation = true
+        #expect(viewModel.showDeleteAccountConfirmation)
+
+        viewModel.showDeleteAccountConfirmation = false
+        #expect(!viewModel.showDeleteAccountConfirmation)
+    }
+
+    // MARK: - Task 5.3: Error message validation
+
+    @Test("accountDeletionFailed error provides warm first-person message")
+    func testAccountDeletionFailedMessage() {
+        let error = SettingsViewModel.SettingsError.accountDeletionFailed
+
+        let description = error.errorDescription ?? ""
+        #expect(description == "I couldn't remove your account right now. Please check your connection and try again.")
+    }
+
+    @Test("AuthError.accountDeletionFailed provides warm first-person message")
+    func testAuthErrorAccountDeletionMessage() {
+        let error = AuthService.AuthError.accountDeletionFailed
+
+        let description = error.errorDescription ?? ""
+        #expect(description == "I couldn't remove your account right now. Please check your connection and try again.")
+    }
+
+    @Test("All SettingsError cases use first-person 'I' language per UX-11")
+    func testAllSettingsErrorsUseFirstPerson() {
+        let errors: [SettingsViewModel.SettingsError] = [
+            .deleteFailed("test"),
+            .signOutFailed("test"),
+            .accountDeletionFailed,
+            .stylePreferenceFailed("test"),
+        ]
+
+        for error in errors {
+            let message = error.errorDescription ?? ""
+            #expect(message.contains("I couldn't"), "Error \(error) should use first-person: \(message)")
+        }
+    }
+
+    @Test("dismissError clears accountDeletionFailed error")
+    func testDismissAccountDeletionError() {
+        let viewModel = SettingsViewModel()
+        viewModel.error = .accountDeletionFailed
+        viewModel.showError = true
+
+        viewModel.dismissError()
+
+        #expect(viewModel.error == nil)
+        #expect(!viewModel.showError)
     }
 }

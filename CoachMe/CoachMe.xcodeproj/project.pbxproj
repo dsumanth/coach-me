@@ -9,7 +9,6 @@
 /* Begin PBXBuildFile section */
 		C93853A92F34F6CF00C5A27E /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = SUPABASE00022F35000000000004 /* Supabase */; };
 		C93853AA2F34F6CF00C5A27E /* RevenueCat in Frameworks */ = {isa = PBXBuildFile; productRef = REVENUECAT022F35000000000005 /* RevenueCat */; };
-		C93853AB2F34F6CF00C5A27E /* Sentry in Frameworks */ = {isa = PBXBuildFile; productRef = SENTRY0000022F35000000000006 /* Sentry */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -43,11 +42,6 @@
 			path = CoachMeTests;
 			sourceTree = "<group>";
 		};
-		C9174FA32F35BA8000CF7AB2 /* CoachMeUITests */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = CoachMeUITests;
-			sourceTree = "<group>";
-		};
 		C93853912F34E29200C5A27E /* CoachMe */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = CoachMe;
@@ -74,7 +68,6 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				C93853AB2F34F6CF00C5A27E /* Sentry in Frameworks */,
 				C93853AA2F34F6CF00C5A27E /* RevenueCat in Frameworks */,
 				C93853A92F34F6CF00C5A27E /* Supabase in Frameworks */,
 			);
@@ -90,7 +83,6 @@
 				C9CFD00B2F50A00100000002 /* Release.xcconfig */,
 				C93853912F34E29200C5A27E /* CoachMe */,
 				C9174F962F35B9C200CF7AB2 /* CoachMeTests */,
-				C9174FA32F35BA8000CF7AB2 /* CoachMeUITests */,
 				C93853902F34E29200C5A27E /* Products */,
 			);
 			sourceTree = "<group>";
@@ -144,9 +136,6 @@
 			dependencies = (
 				C9174FA92F35BA8000CF7AB2 /* PBXTargetDependency */,
 			);
-			fileSystemSynchronizedGroups = (
-				C9174FA32F35BA8000CF7AB2 /* CoachMeUITests */,
-			);
 			name = CoachMeUITests;
 			packageProductDependencies = (
 			);
@@ -174,7 +163,6 @@
 			packageProductDependencies = (
 				SUPABASE00022F35000000000004 /* Supabase */,
 				REVENUECAT022F35000000000005 /* RevenueCat */,
-				SENTRY0000022F35000000000006 /* Sentry */,
 			);
 			productName = CoachMe;
 			productReference = C938538F2F34E29200C5A27E /* CoachMe.app */;
@@ -215,7 +203,6 @@
 			packageReferences = (
 				SUPABASE00012F35000000000001 /* XCRemoteSwiftPackageReference "supabase-swift" */,
 				REVENUECAT012F35000000000002 /* XCRemoteSwiftPackageReference "purchases-ios" */,
-				SENTRY0000012F35000000000003 /* XCRemoteSwiftPackageReference "sentry-cocoa" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = C93853902F34E29200C5A27E /* Products */;
@@ -653,14 +640,6 @@
 				minimumVersion = 5.0.0;
 			};
 		};
-		SENTRY0000012F35000000000003 /* XCRemoteSwiftPackageReference "sentry-cocoa" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/getsentry/sentry-cocoa.git";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 8.0.0;
-			};
-		};
 		SUPABASE00012F35000000000001 /* XCRemoteSwiftPackageReference "supabase-swift" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/supabase/supabase-swift.git";
@@ -672,20 +651,16 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		REVENUECAT022F35000000000005 /* RevenueCat */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = REVENUECAT012F35000000000002 /* XCRemoteSwiftPackageReference "purchases-ios" */;
-			productName = RevenueCat;
-		};
-		SENTRY0000022F35000000000006 /* Sentry */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = SENTRY0000012F35000000000003 /* XCRemoteSwiftPackageReference "sentry-cocoa" */;
-			productName = Sentry;
-		};
+
 		SUPABASE00022F35000000000004 /* Supabase */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = SUPABASE00012F35000000000001 /* XCRemoteSwiftPackageReference "supabase-swift" */;
 			productName = Supabase;
+		};
+		REVENUECAT022F35000000000005 /* RevenueCat */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = REVENUECAT012F35000000000002 /* XCRemoteSwiftPackageReference "purchases-ios" */;
+			productName = RevenueCat;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

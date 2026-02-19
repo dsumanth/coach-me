@@ -121,6 +121,13 @@ struct ContextEditorSheet: View {
             return "What you're working toward"
         case .situation:
             return "About your life right now"
+        case .discoveryField(let key):
+            switch key {
+            case .ahaInsight: return "A key insight about you"
+            case .vision: return "Where you see yourself going"
+            case .communicationStyle: return "How you like to communicate"
+            case .emotionalBaseline: return "Your emotional starting point"
+            }
         }
     }
 
@@ -132,6 +139,13 @@ struct ContextEditorSheet: View {
             return "Edit Goal"
         case .situation:
             return "Edit Life Situation"
+        case .discoveryField(let key):
+            switch key {
+            case .ahaInsight: return "Edit Insight"
+            case .vision: return "Edit Vision"
+            case .communicationStyle: return "Edit Communication Style"
+            case .emotionalBaseline: return "Edit Emotional Baseline"
+            }
         }
     }
 
@@ -143,12 +157,19 @@ struct ContextEditorSheet: View {
             return "e.g., get promoted, start a business"
         case .situation:
             return "Tell me about your life right now..."
+        case .discoveryField(let key):
+            switch key {
+            case .ahaInsight: return "e.g., I thrive when I have clear goals"
+            case .vision: return "e.g., leading a team I believe in"
+            case .communicationStyle: return "e.g., direct and concise"
+            case .emotionalBaseline: return "e.g., generally optimistic but anxious under pressure"
+            }
         }
     }
 
     private var isMultiline: Bool {
         switch editItem.type {
-        case .situation:
+        case .situation, .discoveryField:
             return true
         default:
             return false

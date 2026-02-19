@@ -8,6 +8,7 @@
 import Foundation
 import AuthenticationServices
 import Supabase
+import SwiftData
 
 /// Handles all authentication operations with Sign in with Apple + Supabase sync
 /// Per architecture.md: Auth flow sends Apple identity token to Supabase for verification
@@ -32,6 +33,7 @@ final class AuthService {
         case noSession
         case invalidCredential
         case tokenEncodingFailed
+        case accountDeletionFailed
 
         var errorDescription: String? {
             switch self {
@@ -47,6 +49,8 @@ final class AuthService {
                 return "I had trouble with your Apple credentials. Let's try again."
             case .tokenEncodingFailed:
                 return "I had trouble processing your sign-in. Let's try again."
+            case .accountDeletionFailed:
+                return "I couldn't remove your account right now. Please check your connection and try again."
             }
         }
     }
@@ -251,6 +255,16 @@ final class AuthService {
             // Non-blocking: profile creation failure shouldn't break auth
             await ensureContextProfileExists(userId: session.user.id)
 
+            // Identify user with RevenueCat (Story 6.1) - non-blocking
+            Task {
+                try? await SubscriptionService.shared.identifyUser(userId: session.user.id)
+            }
+
+            // Register device fingerprint (Story 10.2) - non-blocking
+            Task {
+                try? await DeviceFingerprintService.shared.registerDevice(userId: session.user.id)
+            }
+
             #if DEBUG
             print("Successfully signed in user: \(session.user.id)")
             #endif
@@ -284,6 +298,16 @@ final class AuthService {
                 fullName: session.user.userMetadata["full_name"]?.stringValue
             )
 
+            // Re-identify with RevenueCat (Story 6.1) - non-blocking
+            Task {
+                try? await SubscriptionService.shared.identifyUser(userId: session.user.id)
+            }
+
+            // Register device fingerprint (Story 10.2) - non-blocking
+            Task {
+                try? await DeviceFingerprintService.shared.registerDevice(userId: session.user.id)
+            }
+
             #if DEBUG
             print("Session restored for user: \(session.user.id)")
             #endif
@@ -304,11 +328,18 @@ final class AuthService {
     /// Sign out the current user and clear all stored credentials
     func signOut() async throws {
         do {
+            // Log out from RevenueCat (Story 6.1) - non-blocking
+            try? await SubscriptionService.shared.logOutUser()
+
+            // Story 8.2: Remove device token so server stops pushing to this device
+            await PushNotificationService.shared.removeDeviceToken()
+
             // Sign out from Supabase
             try await supabase.auth.signOut()
 
-            // Clear Keychain credentials
+            // Clear Keychain credentials and onboarding state
             try clearSession()
+            OnboardingCoordinator.clearPersistedState()
 
             // Clear current user
             currentUser = nil
@@ -327,6 +358,79 @@ final class AuthService {
         }
     }
 
+    /// Delete the user's account by calling the server-side Edge Function,
+    /// then cleaning up all local state.
+    ///
+    /// Order of operations (critical):
+    /// 1. Call Edge Function FIRST — needs valid JWT (still signed in)
+    /// 2. RevenueCat logout (non-blocking)
+    /// 3. Clear Keychain + in-memory caches
+    /// 4. Purge SwiftData CachedContextProfile records
+    /// 5. Set currentUser = nil
+    ///
+    /// On failure at step 1: throws error, does NOT clear local state.
+    func deleteAccount() async throws {
+        // Step 1: Call Edge Function (requires valid JWT)
+        guard let token = await currentAccessToken else {
+            throw AuthError.accountDeletionFailed
+        }
+
+        guard let url = URL(string: "\(Configuration.supabaseURL)/functions/v1/delete-account") else {
+            throw AuthError.accountDeletionFailed
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(Configuration.supabasePublishableKey, forHTTPHeaderField: "apikey")
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse,
+              httpResponse.statusCode == 200 else {
+            #if DEBUG
+            let body = String(data: data, encoding: .utf8) ?? "no body"
+            print("AuthService: Account deletion failed — response: \(body)")
+            #endif
+            throw AuthError.accountDeletionFailed
+        }
+
+        // Step 1.5: Remove push device token (defense-in-depth; CASCADE handles server-side)
+        await PushNotificationService.shared.removeDeviceToken()
+
+        // Step 2: RevenueCat logout (non-blocking)
+        try? await SubscriptionService.shared.logOutUser()
+
+        // Step 3: Clear Supabase SDK session, Keychain, caches, and onboarding state.
+        // Use .local scope — the server-side user is already deleted by the Edge Function,
+        // so a server-side sign-out would fail. We only need to clear the SDK's persisted session.
+        try? await supabase.auth.signOut(scope: .local)
+        try? clearSession()
+        OnboardingCoordinator.clearPersistedState()
+
+        // Step 4: Purge SwiftData CachedContextProfile records
+        do {
+            let context = AppEnvironment.shared.modelContext
+            let profiles = try context.fetch(FetchDescriptor<CachedContextProfile>())
+            for profile in profiles {
+                context.delete(profile)
+            }
+            try context.save()
+        } catch {
+            #if DEBUG
+            print("AuthService: SwiftData cleanup error (non-fatal): \(error.localizedDescription)")
+            #endif
+        }
+
+        // Step 5: Clear current user
+        currentUser = nil
+
+        #if DEBUG
+        print("AuthService: Account deleted successfully")
+        #endif
+    }
+
     // MARK: - Private Helpers
 
     /// Save session tokens to Keychain
@@ -341,6 +445,8 @@ final class AuthService {
         try keychainManager.clearAllAuthData()
         ConversationListCache.clear()
         ChatMessageCache.clearAll()
+        // Story 7.1: Clear SwiftData offline cache on sign-out
+        OfflineCacheService.shared.clearAllCachedData()
     }
 
     /// Format PersonNameComponents into a display name

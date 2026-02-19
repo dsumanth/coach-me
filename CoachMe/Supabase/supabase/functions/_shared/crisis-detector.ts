@@ -11,7 +11,8 @@
  * Fail-open: On any error, returns crisisDetected = false (never block coaching).
  */
 
-import { type ChatMessage } from './llm-client.ts';
+import { streamChatCompletion, type ChatMessage } from './llm-client.ts';
+import { selectSafetyClassifierModel, enforceInputTokenBudget } from './model-routing.ts';
 
 // MARK: - Types
 
@@ -105,14 +106,13 @@ Return ONLY valid JSON:
 
 /**
  * Classify a message using a lightweight LLM call.
- * Uses Haiku for speed — target <150ms.
+ * Uses safety classifier routing policy.
  */
 async function classifyWithLLM(
   message: string,
   recentMessages: { role: string; content: string }[],
 ): Promise<CrisisDetectionResult> {
-  const apiKey = Deno.env.get('ANTHROPIC_API_KEY');
-  if (!apiKey) {
+  if (!Deno.env.get('OPENAI_API_KEY')) {
     // Fail-open: no API key means we can't classify
     return { crisisDetected: false, confidence: 0, indicators: [], category: null };
   }
@@ -126,29 +126,27 @@ async function classifyWithLLM(
     userContent += `\n\nRecent conversation context:\n${contextStr}`;
   }
 
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-    },
-    body: JSON.stringify({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 100,
-      temperature: 0,
-      system: CRISIS_CLASSIFICATION_PROMPT,
-      messages: [{ role: 'user', content: userContent }],
-    }),
-  });
+  const route = selectSafetyClassifierModel();
+  const messages: ChatMessage[] = [
+    { role: 'system', content: CRISIS_CLASSIFICATION_PROMPT },
+    { role: 'user', content: userContent },
+  ];
+  const budgetedMessages = enforceInputTokenBudget(messages, route.inputBudgetTokens);
 
-  if (!response.ok) {
-    // Fail-open on API error
-    return { crisisDetected: false, confidence: 0, indicators: [], category: null };
+  let text = '';
+  for await (const chunk of streamChatCompletion(budgetedMessages, {
+    provider: route.provider,
+    model: route.model,
+    maxTokens: route.maxOutputTokens,
+    temperature: route.temperature,
+  })) {
+    if (chunk.type === 'token' && chunk.content) {
+      text += chunk.content;
+    }
+    if (chunk.type === 'error') {
+      return { crisisDetected: false, confidence: 0, indicators: [], category: null };
+    }
   }
-
-  const result = await response.json();
-  const text = result.content?.[0]?.text ?? '';
 
   // Parse the JSON response — fail-open on malformed LLM output
   let confidence = 0;

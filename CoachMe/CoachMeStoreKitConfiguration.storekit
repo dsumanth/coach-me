@@ -1,0 +1,70 @@
+{
+  "identifier" : "A1B2C3D4",
+  "nonRenewingSubscriptions" : [
+    {
+      "displayPrice" : "2.99",
+      "familyShareable" : false,
+      "internalID" : "D7E8F9A0",
+      "localizations" : [
+        {
+          "description" : "3 days of coaching access",
+          "displayName" : "3-Day Access",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "coach_app_3day_access",
+      "referenceName" : "3-Day Access"
+    }
+  ],
+  "products" : [
+
+  ],
+  "settings" : {
+    "_failTransactionsEnabled" : false,
+    "_timeRate" : 0
+  },
+  "subscriptionGroups" : [
+    {
+      "id" : "E5F6A7B8",
+      "localizations" : [
+        {
+          "description" : "Coach App Subscriptions",
+          "displayName" : "Coach App Premium",
+          "locale" : "en_US"
+        }
+      ],
+      "name" : "coach_app_subscriptions",
+      "subscriptions" : [
+        {
+          "adHocOffers" : [
+
+          ],
+          "codeOffers" : [
+
+          ],
+          "displayPrice" : "19.99",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "C9D0E1F2",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "Unlimited coaching conversations with your personal AI coach",
+              "displayName" : "Coach App Premium",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "coach_app_premium_monthly",
+          "recurringSubscriptionPeriod" : "P1M",
+          "referenceName" : "Premium Monthly",
+          "subscriptionGroupID" : "E5F6A7B8",
+          "type" : "RecurringSubscription"
+        }
+      ]
+    }
+  ],
+  "version" : {
+    "major" : 4,
+    "minor" : 0
+  }
+}

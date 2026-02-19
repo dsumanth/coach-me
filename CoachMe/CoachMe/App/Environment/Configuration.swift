@@ -50,6 +50,21 @@ struct Configuration {
         return key
     }
 
+    /// RevenueCat Public API Key - read from Info.plist (injected via xcconfig)
+    /// Returns empty string in DEBUG if not configured (allows development without key)
+    /// Fatals in release builds if not configured
+    static var revenueCatAPIKey: String {
+        guard let key = envValue(for: "RevenueCatAPIKey"), !key.isEmpty else {
+            #if DEBUG
+            print("Warning: RevenueCatAPIKey not configured. Subscription features disabled.")
+            return ""
+            #else
+            fatalError("RevenueCatAPIKey not configured.")
+            #endif
+        }
+        return key
+    }
+
     /// Read environment variable from Info.plist (set via xcconfig or build settings)
     private static func envValue(for key: String) -> String? {
         Bundle.main.infoDictionary?[key] as? String
@@ -72,6 +87,9 @@ struct Configuration {
                        !supabasePublishableKey.contains("YOUR_KEY_HERE") &&
                        !supabasePublishableKey.contains("PRODUCTION_KEY")
 
+        let rcKeyValid = !revenueCatAPIKey.isEmpty &&
+                        !revenueCatAPIKey.contains("your_revenuecat")
+
         let isValid = urlValid && keyValid
 
         #if DEBUG
@@ -87,11 +105,19 @@ struct Configuration {
                 print("   - Supabase key needs to be set in xcconfig for \(current.rawValue) environment")
             }
         }
+        if rcKeyValid {
+            print("✅ RevenueCat configuration validated successfully")
+        } else {
+            print("⚠️ RevenueCat API key not configured — subscription features will be disabled")
+        }
         #endif
 
         #if !DEBUG
         if !isValid {
-            assertionFailure("Configuration Error: Supabase credentials not properly configured for \(current.rawValue)")
+            fatalError("Configuration Error: Supabase credentials not properly configured for \(current.rawValue)")
+        }
+        if !rcKeyValid {
+            fatalError("Configuration Error: RevenueCat API key not configured for \(current.rawValue)")
         }
         #endif
 

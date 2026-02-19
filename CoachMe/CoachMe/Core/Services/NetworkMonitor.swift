@@ -35,7 +35,10 @@ final class NetworkMonitor {
 
     init() {
         self.monitor = NWPathMonitor()
-        startMonitoring()
+        // Skip NWPathMonitor in test host — it causes malloc errors in the simulator
+        if ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil {
+            startMonitoring()
+        }
     }
 
     /// Testing initializer that allows setting initial connection state

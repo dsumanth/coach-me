@@ -12,6 +12,11 @@ import XCTest
 @MainActor
 final class ContextExtractionServiceTests: XCTestCase {
 
+    override func tearDown() {
+        super.tearDown()
+        ContextExtractionService.shared.setAuthToken(nil)
+    }
+
     // MARK: - Test: Service Configuration
 
     func testServiceIsSingleton() {
@@ -75,28 +80,25 @@ final class ContextExtractionServiceTests: XCTestCase {
         }
     }
 
-    func testExtractWithEmptyMessagesReturnsEmpty() async {
-        // Given: A service with auth token but empty messages
+    func testExtractWithEmptyMessagesAndNoAuthThrowsNotAuthenticated() async {
+        // Given: A service with NO auth token — throws before empty-message handling is reached
         let service = ContextExtractionService.shared
-        service.setAuthToken("valid-token")
+        service.setAuthToken(nil)
 
         let conversationId = UUID()
         let messages: [ExtractionMessage] = []
 
-        // When: Extracting from empty messages
-        // Note: The service should handle this gracefully
-        // In production, this would hit the API which validates
-        // For unit test purposes, we verify the call doesn't crash
+        // When/Then: With no token, should throw notAuthenticated before any network call
         do {
-            let result = try await service.extractFromConversation(
+            _ = try await service.extractFromConversation(
                 conversationId: conversationId,
                 messages: messages
             )
-            // Empty messages may return empty results - just verify no crash
-            _ = result
+            XCTFail("Should throw notAuthenticated error")
+        } catch let error as ContextExtractionError {
+            XCTAssertEqual(error, .notAuthenticated)
         } catch {
-            // Network error expected in test environment without real API
-            // This is acceptable behavior
+            XCTFail("Unexpected error type: \(error)")
         }
     }
 

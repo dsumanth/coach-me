@@ -28,7 +28,9 @@ final class AppEnvironment {
     lazy var modelContainer: ModelContainer = {
         do {
             let schema = Schema([
-                CachedContextProfile.self
+                CachedContextProfile.self,
+                CachedConversation.self,
+                CachedMessage.self
             ])
             let configuration = ModelConfiguration(
                 schema: schema,
@@ -48,6 +50,12 @@ final class AppEnvironment {
     var modelContext: ModelContext {
         modelContainer.mainContext
     }
+
+    /// Shared subscription view model for trial/subscription state (Story 6.2)
+    lazy var subscriptionViewModel = SubscriptionViewModel()
+
+    /// Story 10.3: Shared trial manager for paid-trial-after-discovery lifecycle
+    lazy var trialManager = TrialManager.shared
 
     private init() {
         // Validate configuration on init

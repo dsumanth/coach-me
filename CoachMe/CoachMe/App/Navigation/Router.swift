@@ -20,6 +20,8 @@ final class Router {
     enum Screen: Equatable {
         /// Welcome/authentication screen
         case welcome
+        /// Onboarding flow for new users (Story 11.3)
+        case onboarding
         /// Main chat screen (authenticated)
         case chat
         /// Conversation list/history screen (Story 3.6)
@@ -66,6 +68,13 @@ final class Router {
         selectedConversationPreloadedMessages = nil
         pendingStarterText = starter
         currentScreen = .chat
+    }
+
+    /// Navigate to the onboarding flow for new users (Story 11.3)
+    func navigateToOnboarding() {
+        withAnimation(.easeInOut(duration: 0.3)) {
+            currentScreen = .onboarding
+        }
     }
 
     /// Navigate to the welcome screen (after sign out or session expiry)

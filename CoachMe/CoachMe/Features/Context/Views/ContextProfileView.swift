@@ -39,6 +39,28 @@ struct ContextProfileView: View {
                         valuesSection(profile.values)
                         goalsSection(profile.goals)
                         situationSection(profile.situation)
+
+                        // Story 11.4: Discovery session data
+                        if profile.hasDiscoveryData {
+                            discoverySection(profile)
+                        }
+
+                        // Story 8.8: Learned knowledge section
+                        LearnedKnowledgeSection(
+                            patterns: viewModel.inferredPatterns,
+                            effectiveStyle: viewModel.effectiveCoachingStyle,
+                            hasManualOverride: viewModel.hasManualStyleOverride,
+                            domainUsage: viewModel.domainUsage,
+                            progressNotes: viewModel.progressNotes,
+                            hasLearnedKnowledge: viewModel.hasLearnedKnowledge,
+                            onDismissInsight: { id in
+                                viewModel.deletingLearnedItemId = id
+                                viewModel.showDeleteLearnedConfirmation = true
+                            },
+                            onEditStyle: {
+                                viewModel.showStyleOverrideSheet = true
+                            }
+                        )
                     } else {
                         emptyStateView
                     }
@@ -101,6 +123,25 @@ struct ContextProfileView: View {
                 }
             } message: {
                 Text(viewModel.error?.errorDescription ?? "Something went wrong. Please try again.")
+            }
+            // Story 8.8: Learned insight delete confirmation
+            .confirmationDialog(
+                "Remove this insight?",
+                isPresented: $viewModel.showDeleteLearnedConfirmation,
+                titleVisibility: .visible
+            ) {
+                Button("Remove", role: .destructive) {
+                    if let id = viewModel.deletingLearnedItemId {
+                        Task { await viewModel.dismissLearnedInsight(id: id) }
+                    }
+                }
+                Button("Keep it", role: .cancel) {}
+            } message: {
+                Text("This won't be suggested again.")
+            }
+            // Story 8.8: Style override sheet
+            .sheet(isPresented: $viewModel.showStyleOverrideSheet) {
+                StyleOverrideSheet(viewModel: viewModel)
             }
         }
     }
@@ -338,20 +379,175 @@ struct ContextProfileView: View {
         }
     }
 
+    // MARK: - Story 11.4: Discovery Section
+
+    @ViewBuilder
+    private func discoverySection(_ profile: ContextProfile) -> some View {
+        VStack(alignment: .leading, spacing: DesignConstants.Spacing.md) {
+            sectionHeader(
+                title: "Your Discovery Session",
+                icon: "sparkles",
+                color: .terracotta
+            )
+
+            // Discovered on date
+            if let discoveryDate = profile.discoveryCompletedAt {
+                Text("Discovered on \(discoveryDate.formatted(date: .abbreviated, time: .omitted))")
+                    .font(.caption)
+                    .foregroundStyle(Color.warmGray400)
+            }
+
+            // Aha insight callout (Story 11.4 AC #6: editable)
+            if let aha = profile.ahaInsight, !aha.isEmpty {
+                AdaptiveGlassContainer {
+                    VStack(alignment: .leading, spacing: DesignConstants.Spacing.xs) {
+                        HStack(spacing: DesignConstants.Spacing.xs) {
+                            Image(systemName: "lightbulb.fill")
+                                .font(.system(size: 16))
+                                .foregroundStyle(Color.terracotta)
+                            Text("Key Insight")
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(Color.terracotta)
+                            Spacer()
+                            discoveryEditButton(.ahaInsight)
+                        }
+                        Text(aha)
+                            .font(.body)
+                            .foregroundStyle(Color.adaptiveText(colorScheme))
+                            .italic()
+                    }
+                }
+                .accessibilityLabel("Key insight from your discovery session: \(aha)")
+            }
+
+            // Coaching domains as chips
+            if !profile.coachingDomains.isEmpty {
+                VStack(alignment: .leading, spacing: DesignConstants.Spacing.xs) {
+                    Text("Coaching Areas")
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(Color.warmGray400)
+
+                    discoveryChipFlow(items: profile.coachingDomains)
+                }
+            }
+
+            // Key themes
+            if !profile.keyThemes.isEmpty {
+                discoveryListField(label: "Key Themes", items: profile.keyThemes)
+            }
+
+            // Strengths
+            if !profile.strengthsIdentified.isEmpty {
+                discoveryListField(label: "Strengths", items: profile.strengthsIdentified)
+            }
+
+            // Vision (Story 11.4 AC #6: editable)
+            if let vision = profile.vision, !vision.isEmpty {
+                AdaptiveGlassContainer {
+                    VStack(alignment: .leading, spacing: DesignConstants.Spacing.xs) {
+                        HStack {
+                            Text("Your Vision")
+                                .font(.caption.weight(.medium))
+                                .foregroundStyle(Color.warmGray400)
+                            Spacer()
+                            discoveryEditButton(.vision)
+                        }
+                        Text(vision)
+                            .font(.body)
+                            .foregroundStyle(Color.adaptiveText(colorScheme))
+                    }
+                }
+            }
+
+            // Communication style (Story 11.4 AC #6: editable)
+            if let style = profile.communicationStyle, !style.isEmpty {
+                editableDiscoveryRow(label: "Communication Style", value: style, key: .communicationStyle)
+            }
+
+            // Emotional baseline (Story 11.4 AC #6: editable)
+            if let baseline = profile.emotionalBaseline, !baseline.isEmpty {
+                editableDiscoveryRow(label: "Emotional Baseline", value: baseline, key: .emotionalBaseline)
+            }
+
+            // Current challenges
+            if !profile.currentChallenges.isEmpty {
+                discoveryListField(label: "Current Challenges", items: profile.currentChallenges)
+            }
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Discovery session section. \(profile.coachingDomains.count) coaching areas identified.")
+    }
+
+    private func discoveryChipFlow(items: [String]) -> some View {
+        FlowLayout(spacing: DesignConstants.Spacing.xs) {
+            ForEach(items, id: \.self) { item in
+                Text(item.capitalized)
+                    .font(.caption.weight(.medium))
+                    .padding(.horizontal, DesignConstants.Spacing.sm)
+                    .padding(.vertical, DesignConstants.Spacing.xxs)
+                    .background(Color.terracotta.opacity(0.12))
+                    .foregroundStyle(Color.terracotta)
+                    .clipShape(Capsule())
+            }
+        }
+    }
+
+    private func discoveryListField(label: String, items: [String]) -> some View {
+        AdaptiveGlassContainer {
+            VStack(alignment: .leading, spacing: DesignConstants.Spacing.xs) {
+                Text(label)
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(Color.warmGray400)
+
+                ForEach(items, id: \.self) { item in
+                    HStack(alignment: .top, spacing: DesignConstants.Spacing.xs) {
+                        Circle()
+                            .fill(Color.warmGray300)
+                            .frame(width: 5, height: 5)
+                            .padding(.top, 6)
+                        Text(item)
+                            .font(.subheadline)
+                            .foregroundStyle(Color.adaptiveText(colorScheme))
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: - Story 11.4 AC #6: Discovery Edit Helpers
+
+    private func discoveryEditButton(_ key: DiscoveryFieldKey) -> some View {
+        Button {
+            viewModel.startEditingDiscoveryField(key)
+        } label: {
+            Image(systemName: "pencil")
+                .font(.system(size: 14))
+                .foregroundStyle(Color.warmGray400)
+                .frame(width: DesignConstants.Size.minTouchTarget, height: DesignConstants.Size.minTouchTarget)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Edit")
+    }
+
+    private func editableDiscoveryRow(label: String, value: String, key: DiscoveryFieldKey) -> some View {
+        HStack {
+            VStack(alignment: .leading, spacing: DesignConstants.Spacing.xxs) {
+                Text(label)
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(Color.warmGray400)
+                Text(value)
+                    .font(.subheadline)
+                    .foregroundStyle(Color.adaptiveText(colorScheme))
+            }
+            Spacer()
+            discoveryEditButton(key)
+        }
+    }
+
     // MARK: - Helper Views
 
     private func sectionHeader(title: String, icon: String, color: Color) -> some View {
-        HStack(spacing: DesignConstants.Spacing.xs) {
-            Image(systemName: icon)
-                .font(.system(size: 16))
-                .foregroundStyle(color)
-
-            Text(title)
-                .font(.headline)
-                .foregroundStyle(Color.adaptiveText(colorScheme))
-        }
-        .accessibilityElement(children: .combine)
-        .accessibilityAddTraits(.isHeader)
+        ProfileSectionHeader(title: title, icon: icon, color: color)
     }
 
     private func emptySectionCard(message: String, icon: String) -> some View {
@@ -416,11 +612,35 @@ struct ContextProfileView: View {
             await viewModel.updateGoal(id: id, newContent: newContent)
         case .situation:
             await viewModel.updateSituation(newContent: newContent)
+        case .discoveryField(let key):
+            await viewModel.updateDiscoveryField(key, newContent: newContent)
         }
     }
 }
 
-private struct ContextProfileRowSurfaceModifier: ViewModifier {
+/// Reusable section header for profile sections (shared across Context views)
+struct ProfileSectionHeader: View {
+    let title: String
+    let icon: String
+    let color: Color
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        HStack(spacing: DesignConstants.Spacing.xs) {
+            Image(systemName: icon)
+                .font(.system(size: 16))
+                .foregroundStyle(color)
+
+            Text(title)
+                .font(.headline)
+                .foregroundStyle(Color.adaptiveText(colorScheme))
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isHeader)
+    }
+}
+
+struct ContextProfileRowSurfaceModifier: ViewModifier {
     let colorScheme: ColorScheme
 
     func body(content: Content) -> some View {

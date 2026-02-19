@@ -1,0 +1,47 @@
+-- Migration: Scheduled trigger configuration for push-trigger Edge Function
+-- Story 8-7: Smart Proactive Push Notifications (Task 6)
+--
+-- CRON SETUP OPTIONS:
+-- ==================
+--
+-- Option A (Recommended): Supabase Dashboard → Edge Functions → Schedules
+--   - Function: push-trigger
+--   - Schedule: "0 10 * * *" (daily at 10:00 AM UTC)
+--   - This is the simplest and most reliable approach.
+--
+-- Option B: pg_cron + pg_net (Supabase Pro required)
+--   - Requires pg_cron and pg_net extensions enabled.
+--   - Store SUPABASE_URL and SERVICE_ROLE_KEY in Vault, then:
+--
+--     SELECT cron.schedule(
+--       'daily-push-trigger',
+--       '0 10 * * *',
+--       $$
+--       SELECT net.http_post(
+--         url := (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'supabase_url')
+--               || '/functions/v1/push-trigger',
+--         headers := jsonb_build_object(
+--           'Content-Type', 'application/json',
+--           'Authorization', 'Bearer ' ||
+--             (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'service_role_key')
+--         ),
+--         body := '{}'::jsonb
+--       );
+--       $$
+--     );
+--
+-- SAFETY GATE:
+-- ============
+-- The push-trigger function checks PUSH_TRIGGER_ENABLED environment variable.
+-- Set to "true" in Edge Function secrets to enable push sending.
+-- Default is disabled — the cron job fires but no pushes are sent.
+--
+-- To enable:
+--   Supabase Dashboard → Edge Functions → push-trigger → Secrets
+--   Add: PUSH_TRIGGER_ENABLED = true
+
+-- This migration is documentation-only. No DDL changes needed.
+-- The push_log table was created in 20260210000006_push_log.sql.
+-- Cron scheduling is configured via Supabase Dashboard (Option A).
+
+SELECT 1; -- No-op migration for tracking purposes

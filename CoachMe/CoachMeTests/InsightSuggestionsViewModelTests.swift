@@ -491,4 +491,5 @@ final class MockContextRepository2_3: ContextRepositoryProtocol {
         dismissInsightCalled = true
         lastDismissedInsightId = insightId
     }
+
 }

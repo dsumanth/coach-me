@@ -28,10 +28,10 @@ export interface LLMConfig {
 }
 
 const DEFAULT_CONFIG: LLMConfig = {
-  provider: 'anthropic',
-  model: 'claude-haiku-4-5-20251001',
-  maxTokens: 4096,
-  temperature: 0.7,
+  provider: 'openai',
+  model: 'gpt-5-mini',
+  maxTokens: 1300,
+  temperature: 0.65,
 };
 
 /**
@@ -165,6 +165,11 @@ async function* streamOpenAI(
 ): AsyncGenerator<StreamChunk> {
   const apiKey = Deno.env.get('OPENAI_API_KEY');
   if (!apiKey) throw new Error('OPENAI_API_KEY not configured');
+  const isGpt5Family = config.model.startsWith('gpt-5');
+  const tokenLimitField = config.model.startsWith('gpt-5')
+    ? { max_completion_tokens: config.maxTokens }
+    : { max_tokens: config.maxTokens };
+  const optionalTemperature = isGpt5Family ? {} : { temperature: config.temperature };
 
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
@@ -174,8 +179,8 @@ async function* streamOpenAI(
     },
     body: JSON.stringify({
       model: config.model,
-      max_tokens: config.maxTokens,
-      temperature: config.temperature,
+      ...tokenLimitField,
+      ...optionalTemperature,
       messages,
       stream: true,
       stream_options: { include_usage: true },
@@ -241,10 +246,16 @@ export function calculateCost(
   const pricing: Record<string, { input: number; output: number }> = {
     // Anthropic pricing per 1M tokens
     'claude-opus-4-5-20251101': { input: 15.0, output: 75.0 },
+    'claude-sonnet-4-5-20250929': { input: 3.0, output: 15.0 },
     'claude-haiku-4-5-20251001': { input: 0.25, output: 1.25 },
     // OpenAI pricing per 1M tokens
+    'gpt-5': { input: 1.25, output: 10.0 },
+    'gpt-5-mini': { input: 0.25, output: 2.0 },
+    'gpt-5-nano': { input: 0.05, output: 0.4 },
     'gpt-4o': { input: 2.5, output: 10.0 },
     'gpt-4o-mini': { input: 0.15, output: 0.6 },
+    // Optional secondary provider reference pricing (if used externally)
+    'gemini-2.5-flash-lite': { input: 0.1, output: 0.4 },
   };
 
   const price = pricing[model] ?? { input: 5.0, output: 15.0 }; // Default fallback

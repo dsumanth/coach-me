@@ -26,10 +26,11 @@ struct ChatStreamServiceTests {
 
         let event = try JSONDecoder().decode(ChatStreamService.StreamEvent.self, from: data)
 
-        if case .token(let content, let hasMemoryMoment, let hasPatternInsight, let hasCrisisFlag) = event {
+        if case .token(let content, let hasMemoryMoment, let hasPatternInsight, let hasCrisisFlag, _) = event {
             #expect(content == "Hello")
             #expect(hasMemoryMoment == false)  // Default when not present
             #expect(hasPatternInsight == false)  // Story 3.4: Default when not present
+            #expect(hasCrisisFlag == false)  // Story 4.1: Default when not present
         } else {
             Issue.record("Expected token event")
         }
@@ -45,10 +46,11 @@ struct ChatStreamServiceTests {
 
         let event = try JSONDecoder().decode(ChatStreamService.StreamEvent.self, from: data)
 
-        if case .token(let content, let hasMemoryMoment, let hasPatternInsight, let hasCrisisFlag) = event {
+        if case .token(let content, let hasMemoryMoment, let hasPatternInsight, let hasCrisisFlag, _) = event {
             #expect(content == "I value [MEMORY: honesty]")
             #expect(hasMemoryMoment == true)
             #expect(hasPatternInsight == false)  // Story 3.4: Not a pattern insight
+            #expect(hasCrisisFlag == false)  // Story 4.1: Not a crisis
         } else {
             Issue.record("Expected token event")
         }
@@ -63,10 +65,11 @@ struct ChatStreamServiceTests {
 
         let event = try JSONDecoder().decode(ChatStreamService.StreamEvent.self, from: data)
 
-        if case .token(let content, let hasMemoryMoment, let hasPatternInsight, let hasCrisisFlag) = event {
+        if case .token(let content, let hasMemoryMoment, let hasPatternInsight, let hasCrisisFlag, _) = event {
             #expect(content == "Regular content")
             #expect(hasMemoryMoment == false)
             #expect(hasPatternInsight == false)
+            #expect(hasCrisisFlag == false)
         } else {
             Issue.record("Expected token event")
         }
@@ -81,11 +84,12 @@ struct ChatStreamServiceTests {
 
         let event = try JSONDecoder().decode(ChatStreamService.StreamEvent.self, from: data)
 
-        if case .done(let messageId, let usage) = event {
+        if case .done(let messageId, let usage, _, let discoveryComplete, _) = event {
             #expect(messageId == UUID(uuidString: "550e8400-e29b-41d4-a716-446655440000"))
             #expect(usage.promptTokens == 10)
             #expect(usage.completionTokens == 20)
             #expect(usage.totalTokens == 30)
+            #expect(discoveryComplete == false)  // Story 11.3: Default when not present
         } else {
             Issue.record("Expected done event")
         }
@@ -142,7 +146,8 @@ struct ChatStreamServiceTests {
         let conversationId = UUID(uuidString: "550e8400-e29b-41d4-a716-446655440000")!
         let request = ChatStreamService.ChatRequest(
             message: "Hello coach",
-            conversationId: conversationId
+            conversationId: conversationId,
+            firstMessage: false
         )
 
         let data = try JSONEncoder().encode(request)
@@ -219,10 +224,11 @@ struct ChatStreamServiceTests {
 
         let event = try JSONDecoder().decode(ChatStreamService.StreamEvent.self, from: data)
 
-        if case .token(let content, let hasMemoryMoment, let hasPatternInsight, let hasCrisisFlag) = event {
+        if case .token(let content, let hasMemoryMoment, let hasPatternInsight, let hasCrisisFlag, _) = event {
             #expect(content == "I noticed [PATTERN: stuck before transitions]")
             #expect(hasMemoryMoment == false)
             #expect(hasPatternInsight == true)
+            #expect(hasCrisisFlag == false)  // Story 4.1: Not a crisis
         } else {
             Issue.record("Expected token event")
         }
@@ -238,9 +244,10 @@ struct ChatStreamServiceTests {
 
         let event = try JSONDecoder().decode(ChatStreamService.StreamEvent.self, from: data)
 
-        if case .token(_, let hasMemoryMoment, let hasPatternInsight, _) = event {
+        if case .token(_, let hasMemoryMoment, let hasPatternInsight, let hasCrisisFlag, _) = event {
             #expect(hasMemoryMoment == true)
             #expect(hasPatternInsight == false)  // Defaults to false
+            #expect(hasCrisisFlag == false)  // Story 4.1: Defaults to false
         } else {
             Issue.record("Expected token event")
         }
@@ -255,9 +262,10 @@ struct ChatStreamServiceTests {
 
         let event = try JSONDecoder().decode(ChatStreamService.StreamEvent.self, from: data)
 
-        if case .token(_, let hasMemoryMoment, let hasPatternInsight, _) = event {
+        if case .token(_, let hasMemoryMoment, let hasPatternInsight, let hasCrisisFlag, _) = event {
             #expect(hasMemoryMoment == true)
             #expect(hasPatternInsight == true)
+            #expect(hasCrisisFlag == false)  // Story 4.1: Not a crisis
         } else {
             Issue.record("Expected token event")
         }
@@ -274,7 +282,7 @@ struct ChatStreamServiceTests {
 
         let event = try JSONDecoder().decode(ChatStreamService.StreamEvent.self, from: data)
 
-        if case .token(let content, let hasMemoryMoment, let hasPatternInsight, let hasCrisisFlag) = event {
+        if case .token(let content, let hasMemoryMoment, let hasPatternInsight, let hasCrisisFlag, _) = event {
             #expect(content == "I hear you")
             #expect(hasMemoryMoment == false)
             #expect(hasPatternInsight == false)
@@ -294,7 +302,7 @@ struct ChatStreamServiceTests {
 
         let event = try JSONDecoder().decode(ChatStreamService.StreamEvent.self, from: data)
 
-        if case .token(_, _, _, let hasCrisisFlag) = event {
+        if case .token(_, _, _, let hasCrisisFlag, _) = event {
             #expect(hasCrisisFlag == false)  // Defaults to false
         } else {
             Issue.record("Expected token event")
@@ -310,7 +318,7 @@ struct ChatStreamServiceTests {
 
         let event = try JSONDecoder().decode(ChatStreamService.StreamEvent.self, from: data)
 
-        if case .token(_, let hasMemoryMoment, let hasPatternInsight, let hasCrisisFlag) = event {
+        if case .token(_, let hasMemoryMoment, let hasPatternInsight, let hasCrisisFlag, _) = event {
             #expect(hasMemoryMoment == true)
             #expect(hasPatternInsight == true)
             #expect(hasCrisisFlag == true)
@@ -329,13 +337,172 @@ struct ChatStreamServiceTests {
 
         let event = try JSONDecoder().decode(ChatStreamService.StreamEvent.self, from: data)
 
-        if case .token(let content, let hasMemoryMoment, let hasPatternInsight, let hasCrisisFlag) = event {
+        if case .token(let content, let hasMemoryMoment, let hasPatternInsight, let hasCrisisFlag, _) = event {
             #expect(content == "Bare minimum")
             #expect(hasMemoryMoment == false)
             #expect(hasPatternInsight == false)
             #expect(hasCrisisFlag == false)
         } else {
             Issue.record("Expected token event")
+        }
+    }
+
+    // MARK: - Story 8.5: Reflection Flag Tests
+
+    @Test("StreamEvent decodes reflection_offered flag true on token event")
+    func testDecodeReflectionOfferedTrue() throws {
+        let json = """
+        {"type":"token","content":"Before we dive in today...","reflection_offered":true}
+        """
+        let data = json.data(using: .utf8)!
+
+        let event = try JSONDecoder().decode(ChatStreamService.StreamEvent.self, from: data)
+
+        if case .token(let content, _, _, _, let reflectionOffered) = event {
+            #expect(content == "Before we dive in today...")
+            #expect(reflectionOffered == true)
+        } else {
+            Issue.record("Expected token event")
+        }
+    }
+
+    @Test("StreamEvent backward compatibility - missing reflection_offered defaults to false")
+    func testDecodeReflectionOfferedBackwardCompat() throws {
+        // Pre-8.5 SSE events don't have reflection_offered field
+        let json = """
+        {"type":"token","content":"Normal","memory_moment":false,"pattern_insight":false,"crisis_detected":false}
+        """
+        let data = json.data(using: .utf8)!
+
+        let event = try JSONDecoder().decode(ChatStreamService.StreamEvent.self, from: data)
+
+        if case .token(_, _, _, _, let reflectionOffered) = event {
+            #expect(reflectionOffered == false)
+        } else {
+            Issue.record("Expected token event")
+        }
+    }
+
+    @Test("StreamEvent decodes reflection_accepted flag true on done event")
+    func testDecodeReflectionAcceptedTrue() throws {
+        let json = """
+        {"type":"done","message_id":"550e8400-e29b-41d4-a716-446655440000","usage":{"prompt_tokens":10,"completion_tokens":20,"total_tokens":30},"reflection_accepted":true}
+        """
+        let data = json.data(using: .utf8)!
+
+        let event = try JSONDecoder().decode(ChatStreamService.StreamEvent.self, from: data)
+
+        if case .done(let messageId, let usage, let reflectionAccepted, _, _) = event {
+            #expect(messageId == UUID(uuidString: "550e8400-e29b-41d4-a716-446655440000"))
+            #expect(usage.totalTokens == 30)
+            #expect(reflectionAccepted == true)
+        } else {
+            Issue.record("Expected done event")
+        }
+    }
+
+    @Test("StreamEvent backward compatibility - missing reflection_accepted defaults to false")
+    func testDecodeReflectionAcceptedBackwardCompat() throws {
+        // Pre-8.5 done events don't have reflection_accepted field
+        let json = """
+        {"type":"done","message_id":"550e8400-e29b-41d4-a716-446655440000","usage":{"prompt_tokens":5,"completion_tokens":10,"total_tokens":15}}
+        """
+        let data = json.data(using: .utf8)!
+
+        let event = try JSONDecoder().decode(ChatStreamService.StreamEvent.self, from: data)
+
+        if case .done(_, _, let reflectionAccepted, let discoveryComplete, _) = event {
+            #expect(reflectionAccepted == false)
+            #expect(discoveryComplete == false)  // Story 11.3: Default when not present
+        } else {
+            Issue.record("Expected done event")
+        }
+    }
+
+    @Test("StreamEvent decodes all five token flags simultaneously")
+    func testDecodeAllFiveTokenFlags() throws {
+        let json = """
+        {"type":"token","content":"All flags set","memory_moment":true,"pattern_insight":true,"crisis_detected":true,"reflection_offered":true}
+        """
+        let data = json.data(using: .utf8)!
+
+        let event = try JSONDecoder().decode(ChatStreamService.StreamEvent.self, from: data)
+
+        if case .token(_, let hasMemoryMoment, let hasPatternInsight, let hasCrisisFlag, let reflectionOffered) = event {
+            #expect(hasMemoryMoment == true)
+            #expect(hasPatternInsight == true)
+            #expect(hasCrisisFlag == true)
+            #expect(reflectionOffered == true)
+        } else {
+            Issue.record("Expected token event")
+        }
+    }
+
+    // MARK: - Story 11.3: discovery_complete Flag Tests
+
+    @Test("StreamEvent decodes discovery_complete flag true on done event")
+    func testDecodeDiscoveryCompleteTrue() throws {
+        let json = """
+        {"type":"done","message_id":"550e8400-e29b-41d4-a716-446655440000","usage":{"prompt_tokens":10,"completion_tokens":20,"total_tokens":30},"discovery_complete":true}
+        """
+        let data = json.data(using: .utf8)!
+
+        let event = try JSONDecoder().decode(ChatStreamService.StreamEvent.self, from: data)
+
+        if case .done(let messageId, _, _, let discoveryComplete, _) = event {
+            #expect(messageId == UUID(uuidString: "550e8400-e29b-41d4-a716-446655440000"))
+            #expect(discoveryComplete == true)
+        } else {
+            Issue.record("Expected done event")
+        }
+    }
+
+    @Test("StreamEvent decodes discovery_complete flag false on done event")
+    func testDecodeDiscoveryCompleteFalse() throws {
+        let json = """
+        {"type":"done","message_id":"550e8400-e29b-41d4-a716-446655440000","usage":{"prompt_tokens":10,"completion_tokens":20,"total_tokens":30},"discovery_complete":false}
+        """
+        let data = json.data(using: .utf8)!
+
+        let event = try JSONDecoder().decode(ChatStreamService.StreamEvent.self, from: data)
+
+        if case .done(_, _, _, let discoveryComplete, _) = event {
+            #expect(discoveryComplete == false)
+        } else {
+            Issue.record("Expected done event")
+        }
+    }
+
+    @Test("StreamEvent backward compatibility - missing discovery_complete defaults to false")
+    func testDecodeDiscoveryCompleteBackwardCompat() throws {
+        let json = """
+        {"type":"done","message_id":"550e8400-e29b-41d4-a716-446655440000","usage":{"prompt_tokens":5,"completion_tokens":10,"total_tokens":15}}
+        """
+        let data = json.data(using: .utf8)!
+
+        let event = try JSONDecoder().decode(ChatStreamService.StreamEvent.self, from: data)
+
+        if case .done(_, _, _, let discoveryComplete, _) = event {
+            #expect(discoveryComplete == false)
+        } else {
+            Issue.record("Expected done event")
+        }
+    }
+
+    @Test("StreamEvent decodes done event with both reflection_accepted and discovery_complete")
+    func testDecodeDoneWithBothFlags() throws {
+        let json = """
+        {"type":"done","message_id":"550e8400-e29b-41d4-a716-446655440000","usage":{"prompt_tokens":10,"completion_tokens":20,"total_tokens":30},"reflection_accepted":true,"discovery_complete":true}
+        """
+        let data = json.data(using: .utf8)!
+
+        let event = try JSONDecoder().decode(ChatStreamService.StreamEvent.self, from: data)
+
+        if case .done(_, _, let reflectionAccepted, let discoveryComplete, _) = event {
+            #expect(reflectionAccepted == true)
+            #expect(discoveryComplete == true)
+        } else {
+            Issue.record("Expected done event")
         }
     }
 }
