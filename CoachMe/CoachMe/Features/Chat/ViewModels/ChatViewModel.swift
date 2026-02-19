@@ -84,6 +84,9 @@ final class ChatViewModel {
     /// Story 8.3: Whether to show the push permission prompt
     var showPushPermissionPrompt = false
 
+    /// Sprint 2: Local feedback state for assistant messages in the current chat session
+    var messageFeedback: [UUID: MessageFeedbackSentiment] = [:]
+
     /// Whether to show the delete confirmation alert (Story 2.6)
     var showDeleteConfirmation = false
 
@@ -130,6 +133,9 @@ final class ChatViewModel {
     /// User message IDs that failed to send and should show inline retry UI
     private var failedUserMessageIDs: Set<UUID> = []
 
+    /// Assistant message IDs currently submitting feedback (prevents duplicate taps)
+    private var submittingFeedbackMessageIDs: Set<UUID> = []
+
     /// Story 8.1: Timestamp of first message in current session (for duration calculation)
     private var sessionStartTime: Date?
 
@@ -174,14 +180,19 @@ final class ChatViewModel {
     /// Conversation service for database operations
     private let conversationService: any ConversationServiceProtocol
 
+    /// Sprint 2: Assistant message feedback persistence
+    private let messageFeedbackService: MessageFeedbackService
+
     // MARK: - Initialization
 
     init(
         chatStreamService: ChatStreamService = ChatStreamService(),
-        conversationService: any ConversationServiceProtocol = ConversationService.shared
+        conversationService: any ConversationServiceProtocol = ConversationService.shared,
+        messageFeedbackService: MessageFeedbackService = MessageFeedbackService.shared
     ) {
         self.chatStreamService = chatStreamService
         self.conversationService = conversationService
+        self.messageFeedbackService = messageFeedbackService
         self.tokenBuffer = StreamingTokenBuffer()
         self.currentConversationId = UUID()
 
@@ -511,6 +522,50 @@ final class ChatViewModel {
         persistCurrentConversationCache()
         inputText = failedMessage.content
         await sendMessage()
+    }
+
+    /// Sprint 2: Returns selected feedback sentiment for a specific assistant message.
+    func feedbackSentiment(for messageID: UUID) -> MessageFeedbackSentiment? {
+        messageFeedback[messageID]
+    }
+
+    /// Sprint 2: Returns whether feedback submission is currently in progress for a message.
+    func isSubmittingFeedback(for messageID: UUID) -> Bool {
+        submittingFeedbackMessageIDs.contains(messageID)
+    }
+
+    /// Sprint 2: Submit thumbs feedback on an assistant response.
+    /// Uses optimistic UI with rollback on failure.
+    func submitAssistantMessageFeedback(
+        messageID: UUID,
+        sentiment: MessageFeedbackSentiment
+    ) async {
+        guard let message = messages.first(where: { $0.id == messageID && $0.role == .assistant }) else {
+            return
+        }
+        guard !submittingFeedbackMessageIDs.contains(messageID) else { return }
+
+        let previous = messageFeedback[messageID]
+        messageFeedback[messageID] = sentiment
+        submittingFeedbackMessageIDs.insert(messageID)
+        defer { submittingFeedbackMessageIDs.remove(messageID) }
+
+        do {
+            try await messageFeedbackService.submitFeedback(
+                conversationId: message.conversationId,
+                messageId: messageID,
+                sentiment: sentiment
+            )
+        } catch {
+            if let previous {
+                messageFeedback[messageID] = previous
+            } else {
+                messageFeedback.removeValue(forKey: messageID)
+            }
+            #if DEBUG
+            print("ChatViewModel: Failed to submit message feedback: \(error.localizedDescription)")
+            #endif
+        }
     }
 
     /// Sends the pending message that was queued while the paywall was showing (Story 6.3 — Task 4.4).
@@ -846,6 +901,8 @@ final class ChatViewModel {
         tokenBuffer?.reset()
         lastUserMessageContent = nil
         failedUserMessageIDs.removeAll()
+        submittingFeedbackMessageIDs.removeAll()
+        messageFeedback.removeAll()
         sessionStartTime = nil  // Story 8.1: Reset session tracking
         error = nil
         showError = false

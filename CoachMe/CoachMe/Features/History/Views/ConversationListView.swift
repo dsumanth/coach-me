@@ -99,7 +99,7 @@ struct ConversationListView: View {
 
     private var topBar: some View {
         ZStack {
-            Text("Coach")
+            Text("CoachMe")
                 .font(.system(size: 20, weight: .semibold, design: .rounded))
                 .foregroundStyle(Color.adaptiveText(colorScheme))
 

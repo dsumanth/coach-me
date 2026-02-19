@@ -149,7 +149,7 @@ struct PaywallView: View {
         case .trialExpired:
             return "Your 3-day access has ended"
         case .generic:
-            return "You've experienced what Coach App can do"
+            return "You've experienced what CoachMe can do"
         }
     }
 

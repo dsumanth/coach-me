@@ -140,6 +140,17 @@ const DISTRESS_TERMS = [
   'no way out',
 ];
 
+const DEPTH_REQUEST_TERMS = [
+  'be honest with me',
+  'tell me the hard truth',
+  'call me out',
+  'push me',
+  'don\'t sugarcoat',
+  'dont sugarcoat',
+  'be direct with me',
+  'challenge me',
+];
+
 const CHARS_PER_TOKEN_APPROX = 4;
 
 export function selectChatModel(input: ChatRoutingInput): ModelSelection {
@@ -151,9 +162,11 @@ export function selectChatModel(input: ChatRoutingInput): ModelSelection {
   const acuteHits = countTermHits(message, ACUTE_RISK_TERMS);
   const highStakesHits = countTermHits(message, HIGH_STAKES_TERMS);
   const distressHits = countTermHits(message, DISTRESS_TERMS);
+  const depthRequestHits = countTermHits(message, DEPTH_REQUEST_TERMS);
   const hasRecentDistress = recentMessages
     .slice(-2)
     .some((m) => countTermHits(m, DISTRESS_TERMS) > 0);
+  const isEarlyConversation = input.sessionMode === 'coaching' && input.recentUserMessages.length <= 2;
 
   // Trigger rule 1: explicit crisis detector signal.
   if (input.crisisDetected) {
@@ -191,6 +204,22 @@ export function selectChatModel(input: ChatRoutingInput): ModelSelection {
   // Trigger rule 6: unusually long high-load message.
   if (message.length >= 900) {
     triggers.push('long_message_900_plus');
+    riskScore += 1;
+  }
+
+  // Trigger rule 7: users explicitly asking for high-accountability coaching depth.
+  if (depthRequestHits > 0) {
+    triggers.push(`depth_request_${depthRequestHits}`);
+    riskScore += 1;
+  }
+
+  // Trigger rule 8: early conversation quality boost for dense emotional/complex turns.
+  if (
+    isEarlyConversation &&
+    message.length >= 220 &&
+    (highStakesHits > 0 || distressHits >= 2 || depthRequestHits > 0)
+  ) {
+    triggers.push('early_depth_turn');
     riskScore += 1;
   }
 

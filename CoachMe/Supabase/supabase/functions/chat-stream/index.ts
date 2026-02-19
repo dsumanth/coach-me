@@ -21,6 +21,7 @@ import type { GoalStatus } from '../_shared/reflection-builder.ts';
 import { determineSessionMode, shouldUpdateConversationType, computeVisibleContent } from '../_shared/session-mode.ts';
 import { checkAndIncrementUsage, getNextResetDate } from '../_shared/rate-limiter.ts';
 import { buildCommitmentReminderDraft } from '../_shared/commitment-reminders.ts';
+import { logProductEvent } from '../_shared/product-events.ts';
 
 interface ChatRequest {
   message: string;
@@ -411,6 +412,8 @@ serve(async (req: Request) => {
       .filter((m) => m.role === 'assistant')
       .map((m) => m.content)
       .slice(-3);
+    const assistantTurnCount = historyMessages.filter((m) => m.role === 'assistant').length;
+    const hasRecentNegativeFeedback = await loadRecentNegativeFeedbackSignal(supabase, userId);
     const modelSelection = selectChatModel({
       sessionMode,
       message: message ?? '',
@@ -424,10 +427,28 @@ serve(async (req: Request) => {
       message: message ?? '',
       recentUserMessages,
       recentAssistantMessages,
+      assistantTurnCount,
+      hasRecentNegativeFeedback,
     });
     if (humanFeelGuard.enabled) {
       console.log(`chat-stream human-feel guard enabled: ${humanFeelGuard.reason}`);
     }
+    void logProductEvent(supabase, {
+      userId,
+      eventName: 'chat_model_selected',
+      conversationId,
+      messageId: firstMessage ? null : userMessageId,
+      properties: {
+        session_mode: sessionMode,
+        selected_model: modelSelection.model,
+        route_tier: modelSelection.routeTier,
+        route_reason: modelSelection.routeReason,
+        human_feel_guard_enabled: humanFeelGuard.enabled,
+        human_feel_guard_reason: humanFeelGuard.reason,
+        has_recent_negative_feedback: hasRecentNegativeFeedback,
+        crisis_detected: crisisResult.crisisDetected,
+      },
+    });
     console.log(`chat-stream model route: ${modelSelection.routeTier} ${modelSelection.model} (${modelSelection.routeReason})`);
     const budgetedMessages = enforceInputTokenBudget(messages, modelSelection.inputBudgetTokens);
     const selectedModel = modelSelection.model;
@@ -636,6 +657,19 @@ serve(async (req: Request) => {
             }
           }
 
+          if (discoveryCompleteFound) {
+            void logProductEvent(supabase, {
+              userId,
+              eventName: 'discovery_completed',
+              conversationId,
+              messageId: assistantMessageId,
+              properties: {
+                profile_saved: discoveryProfileSaved,
+                forced_completion: forceDiscoveryComplete,
+              },
+            });
+          }
+
           // Story 8.5: Default to decline when no tag detected (safe default)
           // Review fix M1: Removed incorrect fallback heuristic that checked the user's
           // CURRENT message instead of their response to the reflection offer
@@ -830,6 +864,8 @@ interface HumanFeelGuardInput {
   message: string;
   recentUserMessages: string[];
   recentAssistantMessages: string[];
+  assistantTurnCount: number;
+  hasRecentNegativeFeedback: boolean;
 }
 
 interface HumanFeelGuardDecision {
@@ -881,8 +917,32 @@ const HUMAN_GUARD_EMPATHY_OPENERS = [
   /^i can hear\b/i,
 ];
 
+async function loadRecentNegativeFeedbackSignal(
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<boolean> {
+  try {
+    const { data, error } = await supabase
+      .from('message_feedback')
+      .select('sentiment')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(6);
+
+    if (error) {
+      console.warn('message_feedback signal unavailable:', error.message);
+      return false;
+    }
+
+    return (data ?? []).some((row: { sentiment: string }) => row.sentiment === 'down');
+  } catch (err) {
+    console.warn('message_feedback signal query failed:', err);
+    return false;
+  }
+}
+
 function shouldApplyHumanFeelGuard(input: HumanFeelGuardInput): HumanFeelGuardDecision {
-  const mode = (Deno.env.get('STRICT_HUMAN_FEEL_MODE') ?? 'selective').toLowerCase();
+  const mode = (Deno.env.get('STRICT_HUMAN_FEEL_MODE') ?? 'adaptive').toLowerCase();
   if (mode === 'off') return { enabled: false, reason: 'mode_off' };
 
   if (input.sessionMode !== 'coaching' || input.crisisDetected) {
@@ -891,6 +951,14 @@ function shouldApplyHumanFeelGuard(input: HumanFeelGuardInput): HumanFeelGuardDe
 
   if (mode === 'always') {
     return { enabled: true, reason: 'mode_always' };
+  }
+
+  if (input.hasRecentNegativeFeedback) {
+    return { enabled: true, reason: 'recent_negative_feedback' };
+  }
+
+  if (mode === 'adaptive' && input.assistantTurnCount < 5) {
+    return { enabled: true, reason: 'early_session_quality_boost' };
   }
 
   const complaintSource = [input.message, ...input.recentUserMessages].join('\n').toLowerCase();

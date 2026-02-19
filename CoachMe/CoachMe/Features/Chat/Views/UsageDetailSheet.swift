@@ -82,7 +82,7 @@ struct UsageDetailSheet: View {
         case .subscribed:
             return "Premium"
         default:
-            return "Coach App"
+            return "CoachMe"
         }
     }
 

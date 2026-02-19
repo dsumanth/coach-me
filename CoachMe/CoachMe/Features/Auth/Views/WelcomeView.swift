@@ -74,7 +74,7 @@ struct WelcomeView: View {
                 .accessibilityHidden(true)
 
             // App name
-            Text("Coach")
+            Text("CoachMe")
                 .font(.system(size: 48, weight: .bold, design: .rounded))
                 .foregroundColor(Color.adaptiveText(colorScheme))
 
@@ -86,7 +86,7 @@ struct WelcomeView: View {
                 .lineSpacing(4)
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("Coach App. Your personal coach, whenever you need.")
+        .accessibilityLabel("CoachMe. Your personal coach, whenever you need.")
     }
 
     /// Sign in with Apple button and section

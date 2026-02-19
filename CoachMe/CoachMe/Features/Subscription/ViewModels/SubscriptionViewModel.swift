@@ -93,7 +93,7 @@ final class SubscriptionViewModel {
         case .trialExpired:
             return "Your 3-day access has ended — subscribe to keep the conversation going"
         case .subscribed:
-            return "You're all set with Coach App Premium"
+            return "You're all set with CoachMe Premium"
         default:
             return ""
         }
@@ -383,7 +383,7 @@ final class SubscriptionViewModel {
         components.minute = 0
 
         let content = UNMutableNotificationContent()
-        content.title = "Coach App"
+        content.title = "CoachMe"
         content.body = "Your 3-day access ends today — subscribe to keep the conversation going."
         content.sound = .default
 

@@ -186,7 +186,7 @@ struct RootView: View {
                     .padding(.bottom, 8)
 
                 // App name
-                Text("Lumina AI")
+                Text("CoachMe")
                     .font(.system(size: 36, weight: .bold, design: .rounded))
                     .foregroundColor(Color.adaptiveText(colorScheme))
 
@@ -199,7 +199,7 @@ struct RootView: View {
         }
         .transition(.opacity)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("Lumina AI App. Loading...")
+        .accessibilityLabel("CoachMe app. Loading...")
     }
 
     private var selectedAppearance: AppAppearance {

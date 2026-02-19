@@ -671,14 +671,14 @@ struct SettingsView: View {
                     .foregroundStyle(Color.adaptiveTerracotta(colorScheme))
                     .accessibilityHidden(true)
 
-                Text("To lock Coach App, long-press the app icon and tap Require Face ID.")
+                Text("To lock CoachMe, long-press the app icon and tap Require Face ID.")
                     .font(.subheadline)
                     .foregroundStyle(Color.adaptiveText(colorScheme, isPrimary: false))
             }
             .padding(16)
             .adaptiveGlass()
             .accessibilityElement(children: .combine)
-            .accessibilityLabel("Security tip: To lock Coach App, long-press the app icon and tap Require Face ID.")
+            .accessibilityLabel("Security tip: To lock CoachMe, long-press the app icon and tap Require Face ID.")
         }
     }
 

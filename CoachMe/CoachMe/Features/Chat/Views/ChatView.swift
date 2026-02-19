@@ -641,7 +641,7 @@ struct ChatView: View {
     private var chatToolbar: some View {
         ZStack {
             // App title
-            Text("Coach")
+            Text("CoachMe")
                 .font(.system(size: 20, weight: .semibold, design: .rounded))
                 .foregroundColor(Color.adaptiveText(colorScheme))
 
@@ -758,15 +758,7 @@ struct ChatView: View {
             ScrollView {
                 LazyVStack(spacing: 0) {
                     ForEach(viewModel.messages) { message in
-                        MessageBubble(
-                            message: message,
-                            isFailedToSend: message.isFromUser && viewModel.isMessageDeliveryFailed(message.id),
-                            onRetry: message.isFromUser ? {
-                                Task {
-                                    await viewModel.retryFailedMessage(message.id)
-                                }
-                            } : nil
-                        )
+                        messageBubble(for: message)
                             .id(message.id)
                     }
 
@@ -858,6 +850,34 @@ struct ChatView: View {
             Spacer()
         }
         .accessibilityLabel("Loading conversation")
+    }
+
+    @ViewBuilder
+    private func messageBubble(for message: ChatMessage) -> some View {
+        MessageBubble(
+            message: message,
+            isFailedToSend: message.isFromUser && viewModel.isMessageDeliveryFailed(message.id),
+            onRetry: message.isFromUser ? {
+                Task {
+                    await viewModel.retryFailedMessage(message.id)
+                }
+            } : nil,
+            feedbackSentiment: message.role == .assistant ? viewModel.feedbackSentiment(for: message.id) : nil,
+            isSubmittingFeedback: message.role == .assistant ? viewModel.isSubmittingFeedback(for: message.id) : false,
+            onFeedback: assistantFeedbackHandler(for: message)
+        )
+    }
+
+    private func assistantFeedbackHandler(for message: ChatMessage) -> ((MessageFeedbackSentiment) -> Void)? {
+        guard message.role == .assistant else { return nil }
+        return { sentiment in
+            Task {
+                await viewModel.submitAssistantMessageFeedback(
+                    messageID: message.id,
+                    sentiment: sentiment
+                )
+            }
+        }
     }
 
     /// Inline suggestion chip for context setup.
@@ -978,7 +998,7 @@ struct ChatView: View {
         case .cancelled:
             return "Your coach is still here — ready to pick up where you left off"
         case .trialExpired, .generic:
-            return "You've experienced what Coach App can do — keep the conversation going"
+            return "You've experienced what CoachMe can do — keep the conversation going"
         }
     }
 

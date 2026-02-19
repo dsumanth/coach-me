@@ -174,7 +174,7 @@ struct NotificationPreferencesView: View {
                     .foregroundStyle(Color.adaptiveTerracotta(colorScheme))
                 }
                 .accessibilityLabel("Open device notification settings")
-                .accessibilityHint("Opens iOS Settings to enable notifications for Coach App")
+                .accessibilityHint("Opens iOS Settings to enable notifications for CoachMe")
             }
             .padding(16)
             .adaptiveGlass()

@@ -19,6 +19,9 @@ struct MessageBubble: View {
     let message: ChatMessage
     var isFailedToSend: Bool = false
     var onRetry: (() -> Void)? = nil
+    var feedbackSentiment: MessageFeedbackSentiment? = nil
+    var isSubmittingFeedback = false
+    var onFeedback: ((MessageFeedbackSentiment) -> Void)? = nil
 
     @Environment(\.colorScheme) private var colorScheme
 
@@ -149,9 +152,36 @@ struct MessageBubble: View {
             }
             .padding(.top, 2)
         } else {
-            Text(message.formattedTime)
-                .font(.caption2)
-                .foregroundColor(Color.adaptiveText(colorScheme, isPrimary: false))
+            HStack(spacing: 10) {
+                Text(message.formattedTime)
+                    .font(.caption2)
+                    .foregroundColor(Color.adaptiveText(colorScheme, isPrimary: false))
+
+                if !message.isFromUser, let onFeedback {
+                    Button {
+                        onFeedback(.up)
+                    } label: {
+                        Image(systemName: feedbackSentiment == .up ? "hand.thumbsup.fill" : "hand.thumbsup")
+                            .font(.caption)
+                            .foregroundStyle(feedbackSentiment == .up ? Color.terracotta : Color.adaptiveText(colorScheme, isPrimary: false))
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isSubmittingFeedback)
+                    .accessibilityLabel("Helpful response")
+
+                    Button {
+                        onFeedback(.down)
+                    } label: {
+                        Image(systemName: feedbackSentiment == .down ? "hand.thumbsdown.fill" : "hand.thumbsdown")
+                            .font(.caption)
+                            .foregroundStyle(feedbackSentiment == .down ? Color.terracotta : Color.adaptiveText(colorScheme, isPrimary: false))
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isSubmittingFeedback)
+                    .accessibilityLabel("Not helpful response")
+                }
+            }
+            .padding(.top, 2)
         }
     }
 
